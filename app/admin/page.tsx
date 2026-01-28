@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import Link from 'next/link';
-import * as XLSX from 'xlsx'; // 엑셀 라이브러리 추가
+import * as XLSX from 'xlsx';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -12,7 +12,6 @@ export default function AdminPage() {
   const [procedures, setProcedures] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
 
-  // 데이터 로드
   const fetchAllData = async () => {
     const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
     if (procData) setProcedures(procData);
@@ -42,7 +41,29 @@ export default function AdminPage() {
     await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
   };
 
-  // ★ 엑셀 업로드 핸들러 (NEW)
+  // ★ 시술 삭제 함수 (NEW)
+  const handleDeleteProcedure = async (id: number) => {
+    if (!confirm("정말 이 시술 정보를 삭제하시겠습니까? (복구 불가)")) return;
+    
+    // 1. 화면에서 즉시 제거
+    setProcedures(procedures.filter(p => p.id !== id));
+    
+    // 2. DB에서 삭제
+    const { error } = await supabase.from('procedures').delete().eq('id', id);
+    if (error) {
+        alert("삭제 실패!");
+        console.error(error);
+        fetchAllData(); // 에러나면 다시 불러오기
+    }
+  };
+
+  // ★ 예약 내역 삭제 함수 (NEW)
+  const handleDeleteReservation = async (id: number) => {
+    if (!confirm("이 예약 내역을 영구 삭제하시겠습니까?")) return;
+    setReservations(reservations.filter(r => r.id !== id));
+    await supabase.from('reservations').delete().eq('id', id);
+  };
+
   const handleFileUpload = (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -56,14 +77,12 @@ export default function AdminPage() {
       const data = XLSX.utils.sheet_to_json(ws);
 
       if (confirm(`${data.length}개의 시술 데이터를 DB에 추가하시겠습니까?`)) {
-        // 데이터 변환 (엑셀 -> DB 포맷)
         const formattedData = data.map((row: any) => ({
             name: row.name,
             rank: row.rank || 99,
             price_krw: row.price_krw,
             category: row.category || 'Etc',
             description: row.description || '',
-            // 엑셀에서는 콤마로 구분 (예: 병원A, 병원B) -> 배열로 변환
             clinics: row.clinics ? row.clinics.split(',').map((c:string) => c.trim()) : [],
             is_hot: row.is_hot === 'TRUE' || row.is_hot === true
         }));
@@ -113,7 +132,6 @@ export default function AdminPage() {
             <p style={{color:'#666', fontSize:'0.9rem'}}>Real-time Database Management</p>
         </div>
         <div style={{display:'flex', gap:'10px'}}>
-             {/* 엑셀 업로드 버튼 디자인 */}
              <label style={{
                 background:'#2e7d32', color:'white', padding:'10px 20px', 
                 borderRadius:'30px', fontWeight:'bold', cursor:'pointer', 
@@ -129,7 +147,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* 예약 현황 섹션 (이전과 동일) */}
+      {/* 예약 현황 섹션 */}
       <section style={{marginBottom:'40px', background:'white', padding:'30px', borderRadius:'16px', boxShadow:'0 2px 10px rgba(0,0,0,0.03)'}}>
         <h2 style={{borderBottom:'2px solid #00B4D8', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>📋 Reservation Management</h2>
         <div style={{width:'100%'}}>
@@ -140,7 +158,8 @@ export default function AdminPage() {
                         <th style={{padding:'15px', textAlign:'left'}}>Customer</th>
                         <th style={{padding:'15px', textAlign:'left'}}>Contact Info</th>
                         <th style={{padding:'15px', textAlign:'left'}}>Target Procedure</th>
-                        <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Status (Action)</th>
+                        <th style={{padding:'15px', textAlign:'left'}}>Status</th>
+                        <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -173,6 +192,12 @@ export default function AdminPage() {
                                         <option value="Cancelled">⚪ Cancelled</option>
                                     </select>
                                 </td>
+                                {/* 예약 삭제 버튼 */}
+                                <td style={{padding:'15px'}}>
+                                    <button onClick={() => handleDeleteReservation(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.1rem'}}>
+                                        <i className="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
                             </tr>
                         );
                     })}
@@ -189,7 +214,8 @@ export default function AdminPage() {
             <tr style={{background:'#F0F4F8', color:'#486581'}}>
                 <th style={{padding:'15px', textAlign:'left', width:'80px', borderRadius:'8px 0 0 8px'}}>Rank</th>
                 <th style={{padding:'15px', textAlign:'left'}}>Procedure Name</th>
-                <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Price (KRW)</th>
+                <th style={{padding:'15px', textAlign:'left'}}>Price (KRW)</th>
+                <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Action</th>
             </tr>
             </thead>
             <tbody>
@@ -207,6 +233,19 @@ export default function AdminPage() {
                         style={{padding:'8px', width:'120px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'1rem'}}
                         />
                     </div>
+                </td>
+                {/* 시술 삭제 버튼 (빨간색) */}
+                <td style={{padding:'15px'}}>
+                    <button 
+                        onClick={() => handleDeleteProcedure(item.id)}
+                        style={{
+                            background:'#ffebed', color:'#d32f2f', border:'none', 
+                            padding:'8px 12px', borderRadius:'8px', cursor:'pointer', fontWeight:'bold',
+                            display:'flex', alignItems:'center', gap:'5px'
+                        }}
+                    >
+                        <i className="fa-solid fa-trash"></i> Delete
+                    </button>
                 </td>
                 </tr>
             ))}
