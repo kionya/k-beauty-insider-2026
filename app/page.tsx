@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Link from 'next/link';
+import styles from './page.module.css';
 
-// 데이터 타입
 type Procedure = {
   id: number;
   name: string;
@@ -34,162 +34,235 @@ export default function Home() {
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const [currentStamps, setCurrentStamps] = useState(MY_STAMPS);
+  const [currentStamps] = useState(MY_STAMPS);
 
-  // ★ 페이지네이션 상태 추가
+  // pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // 한 페이지에 10개씩
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
-      if (data) setProcedures(data);
+      const { data } = await supabase
+        .from('procedures')
+        .select('*')
+        .order('rank', { ascending: true });
+
+      if (data) setProcedures(data as Procedure[]);
       setLoading(false);
     };
+
     fetchData();
   }, []);
 
   const EXCHANGE_RATE = 1400;
-  const getPrice = (krwPrice: number) => currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / EXCHANGE_RATE)}`;
+  const getPrice = (krwPrice: number) =>
+    currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / EXCHANGE_RATE)}`;
 
   const scrollSlider = (direction: number) => {
     const slider = document.getElementById('trendSlider');
-    if (slider) slider.scrollBy({ left: direction * 350, behavior: 'smooth' });
+    if (slider) slider.scrollBy({ left: direction * 360, behavior: 'smooth' });
   };
 
-  // ★ 페이지 계산 로직
+  // page calculation
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = procedures.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(procedures.length / itemsPerPage);
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
+  const handleNextPage = () => currentPage < totalPages && setCurrentPage((p) => p + 1);
+  const handlePrevPage = () => currentPage > 1 && setCurrentPage((p) => p - 1);
 
-  if (loading) return <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>Loading...</div>;
+  if (loading) {
+    return (
+      <div className={styles.page} style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'rgba(255,255,255,0.7)' }}>
+        Loading...
+      </div>
+    );
+  }
 
-  const trendingProcedures = procedures.filter(p => p.rank <= 5);
+  const trendingProcedures = procedures.filter((p) => p.rank <= 5);
 
   return (
-    <>
-      <header>
-        <div className="container nav-wrapper">
-          <div className="logo serif">K-Beauty <span style={{fontStyle:'italic', color:'#D4AF37'}}>Insider</span></div>
-          <nav className="nav-menu">
+    <div className={styles.page}>
+      {/* Header */}
+      <header className={styles.header}>
+        <div className={`container ${styles.navWrap}`}>
+          <div className={styles.logo}>
+            <span className={styles.logoMark}>
+              <i className="fa-solid fa-sparkles"></i>
+            </span>
+            <div className={`${styles.logoName} serif`}>
+              K-Beauty <span>Insider</span>
+            </div>
+          </div>
+
+          <nav className={styles.nav}>
             <a href="#benefits">Loyalty</a>
             <a href="#ranking">Trends</a>
             <a href="#prices">Prices</a>
-            <a href="#partners" style={{color:'#D4AF37', fontWeight:'bold'}}>Free Pass</a>
-            <a href="/admin" style={{marginLeft:'20px', color:'#ccc'}}><i className="fa-solid fa-gear"></i></a>
+            <a href="#partners" className={styles.navCta}>Free Pass</a>
+            <a href="/admin" className={styles.iconLink} aria-label="Admin">
+              <i className="fa-solid fa-gear"></i>
+            </a>
           </nav>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="hero">
+      {/* Hero */}
+      <section className={styles.hero}>
         <div className="container">
-          <span className="hero-category">Premium Medical Concierge</span>
-          <h1 className="serif">Discover the True Price <br/>of Gangnam Beauty.</h1>
-          <p>Transparent pricing from the top 1% clinics in Korea.</p>
-          <a href="#prices" className="btn-primary">View Price List</a>
-        </div>
-      </section>
+          <div className={styles.heroGrid}>
+            <div>
+              <span className={styles.kicker}>
+                <i className="fa-solid fa-shield-heart"></i>
+                Premium Medical Concierge
+              </span>
 
-      {/* 1. Loyalty Program */}
-      <section id="benefits" style={{background:'#FAFAF9', borderBottom:'1px solid #ddd'}}>
-        <div className="container">
-            <h2 className="section-title serif" style={{textAlign:'center', marginBottom:'10px'}}>Loyalty Program</h2>
-            <p className="section-subtitle" style={{textAlign:'center', marginBottom:'40px'}}>Collect 10 stamps to get a free procedure.</p>
-            
-            <div style={{
-                background:'white', padding:'40px', borderRadius:'16px', 
-                boxShadow:'0 10px 30px rgba(0,0,0,0.05)', border:'1px solid #D4AF37', maxWidth:'800px', margin:'0 auto'
-            }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
-                    <div>
-                        <h3 className="serif" style={{fontSize:'1.5rem', color:'#1a1a1a'}}>My Stamps</h3>
-                        <p style={{color:'#888'}}>Visit any partner clinic to earn stamps.</p>
-                    </div>
-                    <div style={{fontSize:'1.2rem', fontWeight:'bold', color:'#D4AF37'}}>
-                        {currentStamps} / {MAX_STAMPS}
-                    </div>
-                </div>
+              <h1 className={`${styles.h1} serif`}>
+                Discover the True Price <br />
+                of Gangnam Beauty.
+              </h1>
 
-                <div style={{display:'flex', justifyContent:'space-between', gap:'10px', marginBottom:'30px', flexWrap:'wrap'}}>
-                    {Array.from({ length: MAX_STAMPS }).map((_, idx) => (
-                        <div key={idx} style={{
-                            width:'50px', height:'50px', borderRadius:'50%', 
-                            border: idx < currentStamps ? 'none' : '2px dashed #ddd',
-                            background: idx < currentStamps ? '#D4AF37' : 'transparent',
-                            color: idx < currentStamps ? 'white' : '#ddd',
-                            display:'flex', justifyContent:'center', alignItems:'center',
-                            fontSize:'1.2rem', fontWeight:'bold'
-                        }}>
-                            {idx < currentStamps ? <i className="fa-solid fa-check"></i> : idx + 1}
-                        </div>
-                    ))}
-                </div>
+              <p className={styles.lead}>
+                Transparent pricing from the top clinics in Korea. Compare trending procedures, see top clinics, and redeem loyalty rewards.
+              </p>
 
-                <div style={{textAlign:'center'}}>
-                    {currentStamps >= MAX_STAMPS ? (
-                        <button style={{
-                            padding:'15px 40px', background:'#1a1a1a', color:'white', 
-                            fontSize:'1.1rem', fontWeight:'bold', borderRadius:'30px', cursor:'pointer'
-                        }}>
-                            Select Free Procedure
-                        </button>
-                    ) : (
-                        <div style={{background:'#f5f5f5', padding:'15px', borderRadius:'8px', color:'#666', fontSize:'0.9rem'}}>
-                            {MAX_STAMPS - currentStamps} more visits needed for a free reward.
-                        </div>
-                    )}
-                </div>
+              <div className={styles.heroActions}>
+                <a href="#prices" className={styles.btnPrimary}>
+                  <i className="fa-solid fa-list"></i> View Price List
+                </a>
+                <a href="#benefits" className={styles.btnGhost}>
+                  <i className="fa-solid fa-ticket"></i> Loyalty Program
+                </a>
+              </div>
             </div>
+
+            <div className={styles.heroPanel}>
+              <div className={styles.metricRow}>
+                <div className={styles.metricIcon}>
+                  <i className="fa-solid fa-chart-line"></i>
+                </div>
+                <div>
+                  <p className={styles.metricTitle}>Monthly Trends</p>
+                  <p className={styles.metricText}>Top 5 procedures auto-highlighted from your Supabase ranking.</p>
+                </div>
+              </div>
+
+              <div className={styles.metricRow}>
+                <div className={styles.metricIcon}>
+                  <i className="fa-solid fa-hand-holding-heart"></i>
+                </div>
+                <div>
+                  <p className={styles.metricTitle}>Transparent Pricing</p>
+                  <p className={styles.metricText}>KRW / USD toggle with a fixed exchange rate (editable).</p>
+                </div>
+              </div>
+
+              <div className={styles.metricRow}>
+                <div className={styles.metricIcon}>
+                  <i className="fa-solid fa-stamp"></i>
+                </div>
+                <div>
+                  <p className={styles.metricTitle}>Loyalty Rewards</p>
+                  <p className={styles.metricText}>Collect stamps at partner clinics and unlock free procedures.</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* 2. Trending Now */}
-      <section id="ranking">
+      {/* 1) Loyalty */}
+      <section id="benefits" className={`${styles.section} ${styles.sectionAlt}`}>
         <div className="container">
-          <div className="section-header">
-             <div>
-               <h2 className="section-title serif">Trending Now</h2>
-               <p className="section-subtitle">Most requested procedures this month.</p>
-             </div>
-             <div style={{display:'flex', gap:'10px'}}>
-               <button onClick={() => scrollSlider(-1)} style={{padding:'10px', border:'1px solid #ddd', background:'white'}}><i className="fa-solid fa-arrow-left"></i></button>
-               <button onClick={() => scrollSlider(1)} style={{padding:'10px', border:'1px solid #ddd', background:'white'}}><i className="fa-solid fa-arrow-right"></i></button>
-             </div>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h2 className={`${styles.title} serif`}>Loyalty Program</h2>
+              <p className={styles.subtitle}>Collect 10 stamps to get a free procedure.</p>
+            </div>
+            <span className={`${styles.pill} ${styles.pillBrand}`}>
+              <i className="fa-solid fa-stamp"></i> My Stamps
+            </span>
           </div>
-          
-          <div className="slider-container">
-            <div className="slider-track" id="trendSlider">
+
+          <div className={styles.card}>
+            <div className={styles.cardInner}>
+              <div className={styles.loyaltyTop}>
+                <div>
+                  <div style={{ fontWeight: 1000, fontSize: 14 }}>Visit any partner clinic to earn stamps.</div>
+                  <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13, marginTop: 4 }}>Redeem after 10 visits.</div>
+                </div>
+                <div className={styles.stampCount}>
+                  {currentStamps} / {MAX_STAMPS}
+                </div>
+              </div>
+
+              <div className={styles.stampsGrid}>
+                {Array.from({ length: MAX_STAMPS }).map((_, idx) => (
+                  <div key={idx} className={`${styles.stamp} ${idx < currentStamps ? styles.stampOn : ''}`}>
+                    {idx < currentStamps ? <i className="fa-solid fa-check"></i> : idx + 1}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                {currentStamps >= MAX_STAMPS ? (
+                  <button className={styles.rewardBtn}>
+                    <i className="fa-solid fa-gift"></i> Select Free Procedure
+                  </button>
+                ) : (
+                  <div className={styles.rewardBox}>
+                    <strong style={{ color: 'rgba(255,255,255,0.90)' }}>
+                      {MAX_STAMPS - currentStamps} more visits
+                    </strong>{' '}
+                    needed for a free reward.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2) Trending */}
+      <section id="ranking" className={styles.section}>
+        <div className="container">
+          <div className={styles.sectionHeader}>
+            <div>
+              <h2 className={`${styles.title} serif`}>Trending Now</h2>
+              <p className={styles.subtitle}>Most requested procedures this month.</p>
+            </div>
+
+            <div className={styles.controlsRow}>
+              <button className={styles.detailBtn} onClick={() => scrollSlider(-1)} aria-label="Scroll left">
+                <i className="fa-solid fa-arrow-left"></i>
+              </button>
+              <button className={styles.detailBtn} onClick={() => scrollSlider(1)} aria-label="Scroll right">
+                <i className="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.sliderWrap}>
+            <div className={styles.sliderTrack} id="trendSlider">
               {trendingProcedures.map((proc) => (
-                <Link href={`/procedures/${proc.id}`} key={proc.id} style={{textDecoration:'none'}}>
-                    <article className="procedure-card" style={{
-                        minWidth:'320px', background:'white', border:'1px solid #eee', 
-                        borderRadius:'12px', padding:'25px', boxShadow:'0 5px 20px rgba(0,0,0,0.05)',
-                        display:'flex', flexDirection:'column', justifyContent:'space-between', height:'100%'
-                    }}>
-                      <div>
-                          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
-                             <div style={{fontSize:'0.8rem', fontWeight:'bold', color:'#D4AF37', textTransform:'uppercase'}}>Rank 0{proc.rank}</div>
-                             {proc.is_hot && <span style={{background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'2px 8px', borderRadius:'10px', fontWeight:'bold'}}>HOT</span>}
-                          </div>
-                          <h3 style={{fontSize:'1.4rem', marginBottom:'10px', color:'#1a1a1a'}}>{proc.name}</h3>
-                          <p style={{color:'#666', fontSize:'0.9rem', lineHeight:'1.5'}}>{proc.description}</p>
+                <Link href={`/procedures/${proc.id}`} key={proc.id}>
+                  <article className={styles.trendCard}>
+                    <div>
+                      <div className={styles.trendTop}>
+                        <div className={styles.rankTag}>Rank 0{proc.rank}</div>
+                        {proc.is_hot && <span className={styles.badgeHot}>HOT</span>}
                       </div>
-                      
-                      <div style={{borderTop:'1px solid #eee', paddingTop:'15px', marginTop:'20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                           <span style={{fontSize:'0.85rem', color:'#999'}}>Avg. Price</span>
-                           <span className="serif" style={{fontSize:'1.2rem', color:'#1a1a1a', fontWeight:'bold'}}>{getPrice(proc.price_krw)}</span>
-                      </div>
-                    </article>
+
+                      <h3 className={styles.trendTitle}>{proc.name}</h3>
+                      <p className={styles.trendDesc}>{proc.description}</p>
+                    </div>
+
+                    <div className={styles.trendBottom}>
+                      <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: 12 }}>Avg. Price</span>
+                      <span className={`${styles.priceStrong} serif`}>{getPrice(proc.price_krw)}</span>
+                    </div>
+                  </article>
                 </Link>
               ))}
             </div>
@@ -197,59 +270,85 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3. Official Price List (페이지네이션 추가됨) */}
-      <section id="prices" style={{background:'#fafafa'}}>
+      {/* 3) Prices (table -> mobile cards) */}
+      <section id="prices" className={`${styles.section} ${styles.sectionAlt}`}>
         <div className="container">
-          <div className="section-header">
-             <h2 className="section-title serif">Official Price List</h2>
-             <div style={{display:'flex', gap:'5px'}}>
-                <button onClick={() => setCurrency('USD')} style={{fontWeight: currency==='USD'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='USD'?'2px solid black':'none'}}>USD</button>
-                <button onClick={() => setCurrency('KRW')} style={{fontWeight: currency==='KRW'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='KRW'?'2px solid black':'none'}}>KRW</button>
-             </div>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h2 className={`${styles.title} serif`}>Official Price List</h2>
+              <p className={styles.subtitle}>Desktop table, mobile auto-cards. Paginated (10 per page).</p>
+            </div>
+
+            <div className={styles.controlsRow}>
+              <div className={styles.toggle} role="tablist" aria-label="Currency toggle">
+                <button
+                  className={`${styles.toggleBtn} ${currency === 'USD' ? styles.toggleBtnActive : ''}`}
+                  onClick={() => setCurrency('USD')}
+                  type="button"
+                >
+                  USD
+                </button>
+                <button
+                  className={`${styles.toggleBtn} ${currency === 'KRW' ? styles.toggleBtnActive : ''}`}
+                  onClick={() => setCurrency('KRW')}
+                  type="button"
+                >
+                  KRW
+                </button>
+              </div>
+
+              <span className={`${styles.pill} ${styles.pillCyan}`}>
+                <i className="fa-solid fa-layer-group"></i> {procedures.length} Procedures
+              </span>
+            </div>
           </div>
 
-          <div className="price-table-wrapper" style={{background:'white', border:'1px solid #eee', borderRadius:'12px', overflow:'hidden', boxShadow:'0 5px 20px rgba(0,0,0,0.03)'}}>
-            <table>
-              <thead>
-                <tr style={{background:'#f9f9f9'}}>
-                  <th style={{width:'80px'}}>Rank</th>
+          <div className={styles.tableShell}>
+            {/* Desktop table */}
+            <table className={styles.table}>
+              <thead className={styles.thead}>
+                <tr>
+                  <th style={{ width: 84 }}>Rank</th>
                   <th>Procedure</th>
                   <th>Top Clinics</th>
-                  <th>Gangnam Price</th>
-                  <th>Action</th>
+                  <th style={{ width: 160 }}>Gangnam Price</th>
+                  <th style={{ width: 120 }}>Action</th>
                 </tr>
               </thead>
+
               <tbody>
-                {currentItems.map((proc) => { // ★ currentItems로 변경됨 (10개씩만 매핑)
+                {currentItems.map((proc) => {
                   const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
                   const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
 
                   return (
-                    <tr key={proc.id}>
-                      <td style={{fontWeight:'bold', color:'#ccc', fontSize:'1.2rem'}}>{proc.rank}</td>
+                    <tr key={proc.id} className={styles.trow}>
+                      <td style={{ fontWeight: 1000, color: 'rgba(255,255,255,0.55)' }}>{proc.rank}</td>
                       <td>
-                          <strong style={{fontSize:'1.1rem'}}>{proc.name}</strong>
-                          <div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div>
+                        <div className={styles.procName}>{proc.name}</div>
+                        <div className={styles.procMeta}>{proc.category}</div>
                       </td>
                       <td>
-                          {displayedClinics.length > 0 ? (
-                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
-                                {displayedClinics.map((c, i) => (
-                                    <div key={i} style={{fontSize:'0.9rem', color:'#555', display:'flex', alignItems:'center'}}>
-                                        <i className="fa-solid fa-hospital" style={{fontSize:'0.7rem', color:'#D4AF37', marginRight:'6px'}}></i>
-                                        {c.split(':')[0]}
-                                    </div>
-                                ))}
-                                {extraCount > 0 && <div style={{fontSize:'0.75rem', color:'#aaa', marginLeft:'15px'}}>+ {extraCount} more</div>}
-                            </div>
-                          ) : (
-                            <span style={{color:'#ddd', fontSize:'0.9rem'}}>-</span>
-                          )}
+                        {displayedClinics.length > 0 ? (
+                          <div className={styles.clinicList}>
+                            {displayedClinics.map((c, i) => (
+                              <div key={i} className={styles.clinicItem}>
+                                <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }}></i>
+                                {c.split(':')[0]}
+                              </div>
+                            ))}
+                            {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>-</span>
+                        )}
                       </td>
-                      <td className="price-tag" style={{color:'#D4AF37'}}>{getPrice(proc.price_krw)}</td>
+                      <td className={`${styles.priceStrong} serif`}>{getPrice(proc.price_krw)}</td>
                       <td>
                         <Link href={`/procedures/${proc.id}`}>
-                           <button style={{border:'1px solid #ddd', background:'white', padding:'8px 15px', borderRadius:'20px', fontWeight:'bold', fontSize:'0.8rem'}}>DETAILS</button>
+                          <button className={styles.detailBtn} type="button">
+                            DETAILS
+                          </button>
                         </Link>
                       </td>
                     </tr>
@@ -257,83 +356,119 @@ export default function Home() {
                 })}
               </tbody>
             </table>
-            
-            {/* ★ 페이지네이션 컨트롤 바 (NEW) */}
-            <div style={{padding:'20px', display:'flex', justifyContent:'center', alignItems:'center', gap:'20px', borderTop:'1px solid #eee'}}>
-                <button 
-                    onClick={handlePrevPage} disabled={currentPage === 1}
-                    style={{
-                        padding:'10px 15px', background: currentPage === 1 ? '#f5f5f5' : 'white', 
-                        border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        color: currentPage === 1 ? '#ccc' : '#333'
-                    }}
-                >
-                    <i className="fa-solid fa-chevron-left"></i> Prev
-                </button>
-                
-                <span style={{fontFamily:'Playfair Display', fontWeight:'bold', color:'#1a1a1a'}}>
-                    Page {currentPage} of {totalPages}
-                </span>
 
-                <button 
-                    onClick={handleNextPage} disabled={currentPage === totalPages}
-                    style={{
-                        padding:'10px 15px', background: currentPage === totalPages ? '#f5f5f5' : 'white', 
-                        border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                        color: currentPage === totalPages ? '#ccc' : '#333'
-                    }}
-                >
-                    Next <i className="fa-solid fa-chevron-right"></i>
-                </button>
+            {/* Mobile cards (auto via CSS) */}
+            <div className={styles.mobileCards}>
+              {currentItems.map((proc) => {
+                const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
+                const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
+
+                return (
+                  <div key={proc.id} className={styles.priceCard}>
+                    <div className={styles.priceCardTop}>
+                      <div>
+                        <h3 className={styles.priceCardTitle}>
+                          #{proc.rank} · {proc.name} {proc.is_hot && <span className={styles.badgeHot} style={{ marginLeft: 8 }}>HOT</span>}
+                        </h3>
+                        <div className={styles.priceCardMeta}>{proc.category}</div>
+                      </div>
+                      <div className={`${styles.priceCardPrice} serif`}>{getPrice(proc.price_krw)}</div>
+                    </div>
+
+                    <div className={styles.priceCardClinics}>
+                      {displayedClinics.length > 0 ? (
+                        <>
+                          {displayedClinics.map((c, i) => (
+                            <div key={i} className={styles.clinicItem}>
+                              <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }}></i>
+                              {c.split(':')[0]}
+                            </div>
+                          ))}
+                          {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
+                        </>
+                      ) : (
+                        <div style={{ color: 'rgba(255,255,255,0.35)' }}>No clinic list</div>
+                      )}
+                    </div>
+
+                    <div className={styles.priceCardActions}>
+                      <Link href={`/procedures/${proc.id}`}>
+                        <button className={styles.detailBtn} type="button">DETAILS</button>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            <div className={styles.pagination}>
+              <button className={styles.pageBtn} onClick={handlePrevPage} disabled={currentPage === 1} type="button">
+                <i className="fa-solid fa-chevron-left"></i> Prev
+              </button>
+
+              <div className={styles.pageInfo}>
+                Page {currentPage} of {totalPages}
+              </div>
+
+              <button className={styles.pageBtn} onClick={handleNextPage} disabled={currentPage === totalPages} type="button">
+                Next <i className="fa-solid fa-chevron-right"></i>
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. Free Pass Clinics (Partners) */}
-      <section id="partners">
+      {/* 4) Partners */}
+      <section id="partners" className={styles.section}>
         <div className="container">
-          <div style={{textAlign:'center', marginBottom:'40px'}}>
-             <h2 className="section-title serif" style={{color:'#D4AF37'}}>Free Pass Clinics</h2>
-             <p className="section-subtitle">
-                <strong>Exclusive Benefit:</strong> You can redeem your free procedure at these partner clinics.
-             </p>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h2 className={`${styles.title} serif`} style={{ color: 'var(--brand)' }}>Free Pass Clinics</h2>
+              <p className={styles.subtitle}>
+                Exclusive Benefit: redeem your free procedure at these partner clinics.
+              </p>
+            </div>
+            <span className={`${styles.pill} ${styles.pillBrand}`}>
+              <i className="fa-solid fa-ticket"></i> FREE PASS
+            </span>
           </div>
-          
-          <div style={{
-              display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', 
-              gap:'20px'
-          }}>
-             {PARTNERS.map((partner, idx) => (
-                <div key={idx} style={{
-                    background:'white', border:'1px solid #eee', padding:'30px', 
-                    borderRadius:'12px', textAlign:'center', transition:'all 0.3s',
-                    boxShadow:'0 5px 15px rgba(0,0,0,0.03)',
-                    position: 'relative', overflow: 'hidden'
-                }} className="hover-card">
-                   <div style={{position:'absolute', top:'15px', right:'15px', background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>
-                       FREE PASS
-                   </div>
-                   <div style={{width:'60px', height:'60px', background:'#f9f9f9', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 20px', color:'#D4AF37'}}>
-                        <i className="fa-solid fa-hospital fa-2x"></i>
-                   </div>
-                   <h3 style={{fontSize:'1.1rem', fontWeight:'bold', marginBottom:'5px'}}>{partner.name}</h3>
-                   <div style={{fontSize:'0.85rem', color:'#888', marginBottom:'15px'}}>{partner.category}</div>
-                   <div style={{fontSize:'0.8rem', color:'#aaa', borderTop:'1px solid #eee', paddingTop:'15px'}}>
-                        <i className="fa-solid fa-location-dot" style={{marginRight:'5px'}}></i> {partner.location}
-                   </div>
+
+          <div className={styles.partnerGrid}>
+            {PARTNERS.map((partner, idx) => (
+              <div key={idx} className={styles.partnerCard}>
+                <div className={`${styles.pill} ${styles.pillBrand} ${styles.partnerTag}`}>
+                  FREE PASS
                 </div>
-             ))}
+
+                <div className={styles.partnerIcon}>
+                  <i className="fa-solid fa-hospital"></i>
+                </div>
+
+                <h3 className={styles.partnerName}>{partner.name}</h3>
+                <p className={styles.partnerMeta}>{partner.category}</p>
+
+                <div className={styles.partnerLoc}>
+                  <i className="fa-solid fa-location-dot" style={{ marginRight: 6 }}></i>
+                  {partner.location}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
-      
-      <footer style={{background:'#1a1a1a', color:'white', padding:'60px 0', textAlign:'center'}}>
+
+      {/* Footer */}
+      <footer className={styles.footer}>
         <div className="container">
-            <div className="serif" style={{fontSize:'1.5rem', marginBottom:'20px'}}>K-Beauty <span style={{fontStyle:'italic', color:'#D4AF37'}}>Insider</span></div>
-            <p style={{color:'#555', fontSize:'0.9rem'}}>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</p>
+          <div className={`${styles.footerBrand} serif`}>
+            K-Beauty <span style={{ fontStyle: 'italic', color: 'var(--brand)' }}>Insider</span>
+          </div>
+          <div style={{ fontSize: 13 }}>
+            &copy; 2026 K-Beauty Insider. Gangnam, Seoul.
+          </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

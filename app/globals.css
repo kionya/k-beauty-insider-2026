@@ -1,74 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
-
 :root {
-  --black: #1a1a1a;
-  --gold: #D4AF37;
-  --gray: #888888;
-  --light-gray: #f5f5f5;
-  --white: #ffffff;
-  --border: #e0e0e0;
+  --bg: #0b0f14;
+  --panel: rgba(255,255,255,0.06);
+  --panel-2: rgba(255,255,255,0.08);
+  --card: rgba(255,255,255,0.08);
+  --card-2: rgba(255,255,255,0.10);
+
+  --text: rgba(255,255,255,0.92);
+  --text-muted: rgba(255,255,255,0.62);
+  --text-faint: rgba(255,255,255,0.45);
+
+  --border: rgba(255,255,255,0.10);
+  --border-2: rgba(255,255,255,0.14);
+
+  --brand: #d4af37;
+  --brand-2: #7dd3fc; /* cyan accent for SaaS feel */
+  --danger: #fb7185;
+
+  --shadow: 0 14px 40px rgba(0,0,0,0.45);
+  --shadow-soft: 0 10px 26px rgba(0,0,0,0.35);
+
+  --radius-xl: 22px;
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --radius-sm: 12px;
+
+  --container: 1120px;
 }
 
-* { box-sizing: border-box; padding: 0; margin: 0; }
+* { box-sizing: border-box; }
 
-body {
-  font-family: 'Manrope', sans-serif;
-  background-color: var(--white);
-  color: var(--black);
-  line-height: 1.6;
+html, body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
-h1, h2, h3, .serif { font-family: 'Playfair Display', serif; }
-
-a { text-decoration: none; color: inherit; transition: all 0.3s; }
-ul { list-style: none; }
-button { font-family: 'Manrope', sans-serif; cursor: pointer; border: none; }
+a { color: inherit; }
 
 .container {
-  max-width: 1200px;
+  width: min(var(--container), calc(100% - 40px));
   margin: 0 auto;
-  padding: 0 20px;
 }
 
-header {
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  padding: 20px 0;
+.serif {
+  font-family: "Playfair Display", ui-serif, Georgia, serif;
 }
-.nav-wrapper { display: flex; justify-content: space-between; align-items: center; }
-.logo { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.5px; }
-.nav-menu a { margin-left: 25px; font-size: 0.9rem; font-weight: 500; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; }
-.nav-menu a:hover { color: var(--black); }
 
-.hero {
-  padding: 120px 0 80px;
-  text-align: center;
-  background: linear-gradient(to bottom, #fff 0%, #fafafa 100%);
+button {
+  font-family: inherit;
 }
-.hero-category { color: var(--gold); font-weight: 600; letter-spacing: 3px; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 20px; display: block; }
-.hero h1 { font-size: 4.5rem; line-height: 1.1; margin-bottom: 30px; color: var(--black); }
-.hero p { font-size: 1.2rem; color: var(--gray); max-width: 500px; margin: 0 auto 40px; font-weight: 300; }
-.btn-primary { padding: 15px 40px; background: var(--black); color: var(--white); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s; }
-.btn-primary:hover { background: var(--gold); color: var(--black); }
 
-section { padding: 80px 0; }
-.section-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; }
-.section-title { font-size: 2.5rem; line-height: 1.2; }
-.section-subtitle { color: var(--gray); margin-top: 10px; }
-
-/* 슬라이더 */
-.slider-container { position: relative; overflow: hidden; }
-.slider-track { display: flex; gap: 30px; overflow-x: auto; scrollbar-width: none; padding: 20px 5px; }
-.slider-track::-webkit-scrollbar { display: none; }
-
-/* 카드에 호버 효과 */
-.hover-card:hover { transform: translateY(-5px); border-color: var(--gold) !important; }
-
-/* 가격표 */
-.price-table-wrapper table { width: 100%; border-collapse: collapse; }
-.price-table-wrapper th { text-align: left; padding: 20px; border-bottom: 2px solid var(--black); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
-.price-table-wrapper td { padding: 25px 20px; border-bottom: 1px solid var(--light-gray); }
-.price-tag { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 600; }
+@media (max-width: 640px){
+  .container { width: calc(100% - 28px); }
+}
