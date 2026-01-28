@@ -38,6 +38,36 @@ export default function AdminPage() {
     await supabase.from('procedures').update({ price_krw: priceNumber }).eq('id', id);
   };
 
+  // ★ 예약 상태 변경 함수 (추가됨)
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    // 1. 화면 즉시 반영 (빠른 반응 속도)
+    setReservations(reservations.map(res => 
+      res.id === id ? { ...res, status: newStatus } : res
+    ));
+
+    // 2. 실제 DB 업데이트
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      alert("상태 변경 실패!");
+      console.error(error);
+    }
+  };
+
+  // 상태별 뱃지 색상
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Pending': return { bg: '#fff3e0', text: '#e65100' }; // 주황 (대기)
+      case 'Confirmed': return { bg: '#e8f5e9', text: '#2e7d32' }; // 초록 (확정)
+      case 'Completed': return { bg: '#e3f2fd', text: '#1565c0' }; // 파랑 (완료)
+      case 'Cancelled': return { bg: '#f5f5f5', text: '#757575' }; // 회색 (취소)
+      default: return { bg: '#eee', text: '#333' };
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', background:'#f0f2f5'}}>
@@ -51,7 +81,6 @@ export default function AdminPage() {
   }
 
   return (
-    // ▼ maxWidth를 100%로 변경하여 화면을 꽉 채움
     <div style={{padding:'40px 5%', width:'100%', minHeight:'100vh', background:'#f8f9fa'}}>
       
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
@@ -64,11 +93,10 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      {/* --- 섹션 1: 예약 접수 현황 (NEW) --- */}
+      {/* --- 섹션 1: 예약 접수 현황 (업데이트됨) --- */}
       <section style={{marginBottom:'40px', background:'white', padding:'30px', borderRadius:'16px', boxShadow:'0 2px 10px rgba(0,0,0,0.03)'}}>
-        <h2 style={{borderBottom:'2px solid #00B4D8', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>📋 New Leads (Reservations)</h2>
+        <h2 style={{borderBottom:'2px solid #00B4D8', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>📋 Reservation Management</h2>
         
-        {/* 가로 스크롤 제거됨 (화면이 넓어져서) */}
         <div style={{width:'100%'}}>
             <table style={{width:'100%', borderCollapse:'collapse'}}>
                 <thead>
@@ -77,35 +105,52 @@ export default function AdminPage() {
                         <th style={{padding:'15px', textAlign:'left'}}>Customer</th>
                         <th style={{padding:'15px', textAlign:'left'}}>Contact Info</th>
                         <th style={{padding:'15px', textAlign:'left'}}>Target Procedure</th>
-                        <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Status</th>
+                        <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Status (Action)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {reservations.length === 0 ? (
                         <tr><td colSpan={5} style={{padding:'30px', textAlign:'center', color:'#888'}}>아직 접수된 예약이 없습니다.</td></tr>
                     ) : (
-                        reservations.map((res) => (
-                            <tr key={res.id} style={{borderBottom:'1px solid #f1f3f5'}}>
-                                <td style={{padding:'15px', fontSize:'0.9rem', color:'#666'}}>{new Date(res.created_at).toLocaleDateString()} {new Date(res.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                                <td style={{padding:'15px', fontWeight:'bold', fontSize:'1rem'}}>{res.customer_name}</td>
-                                <td style={{padding:'15px'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                        <span style={{fontSize:'0.75rem', background:'#e3f2fd', color:'#1565c0', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{res.messenger_type}</span>
-                                        <span style={{fontSize:'1rem'}}>{res.contact_info}</span>
-                                    </div>
-                                </td>
-                                <td style={{padding:'15px', color:'#00B4D8', fontWeight:'600'}}>{res.procedure_name}</td>
-                                <td style={{padding:'15px'}}>
-                                    <span style={{
-                                        color: res.status === 'Pending' ? '#d32f2f' : '#2e7d32', 
-                                        background: res.status === 'Pending' ? '#ffebee' : '#e8f5e9',
-                                        padding: '5px 12px', borderRadius:'20px', fontSize:'0.85rem', fontWeight:'bold'
-                                    }}>
-                                        {res.status}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))
+                        reservations.map((res) => {
+                            const colors = getStatusColor(res.status);
+                            return (
+                                <tr key={res.id} style={{borderBottom:'1px solid #f1f3f5'}}>
+                                    <td style={{padding:'15px', fontSize:'0.9rem', color:'#666'}}>{new Date(res.created_at).toLocaleDateString()}</td>
+                                    <td style={{padding:'15px', fontWeight:'bold', fontSize:'1rem'}}>{res.customer_name}</td>
+                                    <td style={{padding:'15px'}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                            <span style={{fontSize:'0.75rem', background:'#e3f2fd', color:'#1565c0', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{res.messenger_type}</span>
+                                            <span style={{fontSize:'1rem'}}>{res.contact_info}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{padding:'15px', color:'#00B4D8', fontWeight:'600'}}>{res.procedure_name}</td>
+                                    <td style={{padding:'15px'}}>
+                                        {/* ▼ 상태 변경 드롭다운 ▼ */}
+                                        <select
+                                            value={res.status}
+                                            onChange={(e) => handleStatusChange(res.id, e.target.value)}
+                                            style={{
+                                                padding: '8px 12px',
+                                                borderRadius: '20px',
+                                                border: 'none',
+                                                background: colors.bg,
+                                                color: colors.text,
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                outline: 'none',
+                                                fontSize: '0.9rem'
+                                            }}
+                                        >
+                                            <option value="Pending">🟠 Pending</option>
+                                            <option value="Confirmed">🟢 Confirmed</option>
+                                            <option value="Completed">🔵 Completed</option>
+                                            <option value="Cancelled">⚪ Cancelled</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            );
+                        })
                     )}
                 </tbody>
             </table>
