@@ -37,6 +37,10 @@ export default function Home() {
   
   const [currentStamps, setCurrentStamps] = useState(MY_STAMPS);
 
+  // ★ 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // 한 페이지에 10개씩
+
   useEffect(() => {
     const fetchData = async () => {
       const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
@@ -52,6 +56,19 @@ export default function Home() {
   const scrollSlider = (direction: number) => {
     const slider = document.getElementById('trendSlider');
     if (slider) slider.scrollBy({ left: direction * 350, behavior: 'smooth' });
+  };
+
+  // ★ 페이지 계산 로직
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = procedures.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(procedures.length / itemsPerPage);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
 
   if (loading) return <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>Loading...</div>;
@@ -180,7 +197,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3. Official Price List (수정됨: 병원 2개 노출) */}
+      {/* 3. Official Price List (페이지네이션 추가됨) */}
       <section id="prices" style={{background:'#fafafa'}}>
         <div className="container">
           <div className="section-header">
@@ -197,14 +214,13 @@ export default function Home() {
                 <tr style={{background:'#f9f9f9'}}>
                   <th style={{width:'80px'}}>Rank</th>
                   <th>Procedure</th>
-                  <th>Top Clinics</th> {/* 컬럼 변경됨 */}
+                  <th>Top Clinics</th>
                   <th>Gangnam Price</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {procedures.map((proc) => {
-                  // ★ 병원 이름 2개만 추출
+                {currentItems.map((proc) => { // ★ currentItems로 변경됨 (10개씩만 매핑)
                   const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
                   const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
 
@@ -215,7 +231,6 @@ export default function Home() {
                           <strong style={{fontSize:'1.1rem'}}>{proc.name}</strong>
                           <div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div>
                       </td>
-                      {/* ★ 병원 리스트 노출 (최대 2개) */}
                       <td>
                           {displayedClinics.length > 0 ? (
                             <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
@@ -242,6 +257,35 @@ export default function Home() {
                 })}
               </tbody>
             </table>
+            
+            {/* ★ 페이지네이션 컨트롤 바 (NEW) */}
+            <div style={{padding:'20px', display:'flex', justifyContent:'center', alignItems:'center', gap:'20px', borderTop:'1px solid #eee'}}>
+                <button 
+                    onClick={handlePrevPage} disabled={currentPage === 1}
+                    style={{
+                        padding:'10px 15px', background: currentPage === 1 ? '#f5f5f5' : 'white', 
+                        border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        color: currentPage === 1 ? '#ccc' : '#333'
+                    }}
+                >
+                    <i className="fa-solid fa-chevron-left"></i> Prev
+                </button>
+                
+                <span style={{fontFamily:'Playfair Display', fontWeight:'bold', color:'#1a1a1a'}}>
+                    Page {currentPage} of {totalPages}
+                </span>
+
+                <button 
+                    onClick={handleNextPage} disabled={currentPage === totalPages}
+                    style={{
+                        padding:'10px 15px', background: currentPage === totalPages ? '#f5f5f5' : 'white', 
+                        border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        color: currentPage === totalPages ? '#ccc' : '#333'
+                    }}
+                >
+                    Next <i className="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
           </div>
         </div>
       </section>
