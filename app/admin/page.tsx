@@ -12,6 +12,18 @@ export default function AdminPage() {
   const [procedures, setProcedures] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
 
+  // ★ 개별 등록 팝업 상태
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProc, setNewProc] = useState({
+    name: '',
+    rank: 99,
+    price_krw: 0,
+    category: 'Skin Care',
+    description: '',
+    clinics: '', // 텍스트로 입력받음 (예: A의원:50000)
+    is_hot: false
+  });
+
   const fetchAllData = async () => {
     const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
     if (procData) setProcedures(procData);
@@ -29,19 +41,16 @@ export default function AdminPage() {
     else alert('Wrong Password!');
   };
 
-  // 값 수정 핸들러 (자동 저장)
   const handleUpdate = async (id: number, field: string, value: any) => {
     setProcedures(procedures.map(item => item.id === id ? { ...item, [field]: value } : item));
     await supabase.from('procedures').update({ [field]: value }).eq('id', id);
   };
 
-  // 병원 리스트 수정
   const handleClinicUpdate = async (id: number, text: string) => {
     const clinicArray = text.split(',').map(c => c.trim());
     handleUpdate(id, 'clinics', clinicArray);
   };
 
-  // 삭제 핸들러들
   const handleDeleteProcedure = async (id: number) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
     setProcedures(procedures.filter(p => p.id !== id));
@@ -57,6 +66,33 @@ export default function AdminPage() {
   const handleStatusChange = async (id: number, newStatus: string) => {
     setReservations(reservations.map(res => res.id === id ? { ...res, status: newStatus } : res));
     await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
+  };
+
+  // ★ 개별 아이템 등록 함수 (NEW)
+  const handleAddNewItem = async () => {
+    if (!newProc.name || !newProc.price_krw) return alert("시술명과 가격은 필수입니다!");
+
+    const formattedClinics = newProc.clinics ? newProc.clinics.split(',').map(c => c.trim()) : [];
+
+    const { error } = await supabase.from('procedures').insert({
+        name: newProc.name,
+        rank: newProc.rank,
+        price_krw: newProc.price_krw,
+        category: newProc.category,
+        description: newProc.description,
+        clinics: formattedClinics,
+        is_hot: newProc.is_hot
+    });
+
+    if (error) {
+        alert("등록 실패!");
+        console.error(error);
+    } else {
+        alert("등록되었습니다!");
+        setIsAddModalOpen(false);
+        setNewProc({ name: '', rank: 99, price_krw: 0, category: 'Skin Care', description: '', clinics: '', is_hot: false }); // 초기화
+        fetchAllData(); // 목록 새로고침
+    }
   };
 
   const handleFileUpload = (e: any) => {
@@ -114,7 +150,19 @@ export default function AdminPage() {
             <p style={{color:'#666', fontSize:'0.9rem'}}>Real-time Database Management</p>
         </div>
         <div style={{display:'flex', gap:'10px'}}>
-             {/* 엑셀 업로드 버튼 (디자인 복구) */}
+             {/* 1. 개별 등록 버튼 (NEW) */}
+             <button 
+                onClick={() => setIsAddModalOpen(true)}
+                style={{
+                    background:'#1976d2', color:'white', padding:'10px 20px', 
+                    borderRadius:'30px', fontWeight:'bold', cursor:'pointer', border:'none',
+                    display:'flex', alignItems:'center', gap:'5px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'
+                }}
+             >
+                <i className="fa-solid fa-plus"></i> Add New
+             </button>
+
+             {/* 2. 엑셀 업로드 버튼 */}
              <label style={{
                 background:'#2e7d32', color:'white', padding:'10px 20px', 
                 borderRadius:'30px', fontWeight:'bold', cursor:'pointer', 
@@ -125,7 +173,7 @@ export default function AdminPage() {
              </label>
 
             <Link href="/" style={{textDecoration:'none', background:'white', padding:'10px 20px', borderRadius:'30px', border:'1px solid #ddd', fontWeight:'bold', color:'#102A43', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                View Live Site <i className="fa-solid fa-arrow-up-right-from-square" style={{marginLeft:'5px'}}></i>
+                View Site <i className="fa-solid fa-arrow-up-right-from-square" style={{marginLeft:'5px'}}></i>
             </Link>
         </div>
       </div>
@@ -175,7 +223,6 @@ export default function AdminPage() {
                                         <option value="Cancelled">⚪ Cancelled</option>
                                     </select>
                                 </td>
-                                {/* 예약 삭제 버튼 (디자인 복구) */}
                                 <td style={{padding:'15px'}}>
                                     <button onClick={() => handleDeleteReservation(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.1rem', transition:'color 0.2s'}}>
                                         <i className="fa-solid fa-trash-can"></i>
@@ -205,14 +252,12 @@ export default function AdminPage() {
             <tbody>
             {procedures.map((item) => (
                 <tr key={item.id} style={{borderBottom:'1px solid #f1f3f5'}}>
-                    {/* 1. 랭킹 수정 */}
                     <td style={{padding:'15px'}}>
                         <input type="number" defaultValue={item.rank} 
                         onBlur={(e) => handleUpdate(item.id, 'rank', e.target.value)}
                         style={{width:'50px', padding:'8px', border:'1px solid #ddd', borderRadius:'6px', fontWeight:'bold', textAlign:'center'}} />
                     </td>
                     <td style={{padding:'15px', fontWeight:'bold', fontSize:'1rem', color:'#102A43'}}>{item.name}</td>
-                    {/* 2. 평균 가격 수정 */}
                     <td style={{padding:'15px'}}>
                         <div style={{display:'flex', alignItems:'center'}}>
                             <span style={{marginRight:'5px', color:'#666'}}>₩</span>
@@ -221,14 +266,12 @@ export default function AdminPage() {
                             style={{width:'100px', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}} />
                         </div>
                     </td>
-                    {/* 3. 병원 리스트 수정 */}
                     <td style={{padding:'15px'}}>
                         <input type="text" defaultValue={item.clinics?.join(', ')} 
                         onBlur={(e) => handleClinicUpdate(item.id, e.target.value)}
                         placeholder="Ex: ClinicA:50000, ClinicB:60000"
                         style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'0.9rem'}} />
                     </td>
-                    {/* 4. 삭제 버튼 (디자인 복구) */}
                     <td style={{padding:'15px'}}>
                         <button 
                             onClick={() => handleDeleteProcedure(item.id)}
@@ -246,6 +289,55 @@ export default function AdminPage() {
             </tbody>
         </table>
       </section>
+
+      {/* ★ 개별 등록 모달창 (NEW) */}
+      {isAddModalOpen && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.5)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000}}>
+            <div style={{background:'white', padding:'30px', borderRadius:'16px', width:'400px', boxShadow:'0 10px 25px rgba(0,0,0,0.2)'}}>
+                <h2 style={{marginBottom:'20px', color:'#102A43'}}>Add New Procedure</h2>
+                
+                <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Name *</label>
+                <input type="text" value={newProc.name} onChange={(e)=>setNewProc({...newProc, name: e.target.value})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="e.g. Rejuran Healer" />
+
+                <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Category</label>
+                <select value={newProc.category} onChange={(e)=>setNewProc({...newProc, category: e.target.value})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}}>
+                    <option value="Skin Care">Skin Care</option>
+                    <option value="Lifting">Lifting</option>
+                    <option value="Botox/Filler">Botox/Filler</option>
+                    <option value="Body">Body</option>
+                </select>
+
+                <div style={{display:'flex', gap:'10px'}}>
+                    <div style={{flex:1}}>
+                        <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Price (Avg) *</label>
+                        <input type="number" value={newProc.price_krw} onChange={(e)=>setNewProc({...newProc, price_krw: parseInt(e.target.value)})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="KRW" />
+                    </div>
+                    <div style={{width:'80px'}}>
+                        <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Rank</label>
+                        <input type="number" value={newProc.rank} onChange={(e)=>setNewProc({...newProc, rank: parseInt(e.target.value)})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}} />
+                    </div>
+                </div>
+
+                <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Clinics (Format: Name:Price)</label>
+                <input type="text" value={newProc.clinics} onChange={(e)=>setNewProc({...newProc, clinics: e.target.value})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="e.g. Muse:50000, Toxnfill:60000" />
+
+                <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Description</label>
+                <textarea rows={3} value={newProc.description} onChange={(e)=>setNewProc({...newProc, description: e.target.value})} style={{width:'100%', padding:'10px', marginBottom:'15px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Short description..." />
+
+                <div style={{marginBottom:'20px'}}>
+                    <label style={{display:'flex', alignItems:'center', cursor:'pointer'}}>
+                        <input type="checkbox" checked={newProc.is_hot} onChange={(e)=>setNewProc({...newProc, is_hot: e.target.checked})} style={{marginRight:'10px', transform:'scale(1.2)'}} />
+                        Make this item <strong>HOT TREND</strong>
+                    </label>
+                </div>
+
+                <div style={{display:'flex', gap:'10px'}}>
+                    <button onClick={handleAddNewItem} style={{flex:1, padding:'15px', background:'#1976d2', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold', cursor:'pointer'}}>Add Item</button>
+                    <button onClick={()=>setIsAddModalOpen(false)} style={{padding:'15px', background:'#eee', color:'#333', border:'none', borderRadius:'8px', fontWeight:'bold', cursor:'pointer'}}>Cancel</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
