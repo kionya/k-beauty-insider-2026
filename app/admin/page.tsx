@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<any[]>([]);
 
   const fetchAllData = async () => {
+    // 랭킹순 정렬
     const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
     if (procData) setProcedures(procData);
 
@@ -29,11 +30,32 @@ export default function AdminPage() {
     else alert('Wrong Password!');
   };
 
-  const handleSavePrice = async (id: number, newPrice: string) => {
-    const priceNumber = parseInt(newPrice);
-    if (isNaN(priceNumber)) return;
-    setProcedures(procedures.map(item => item.id === id ? { ...item, price_krw: priceNumber } : item));
-    await supabase.from('procedures').update({ price_krw: priceNumber }).eq('id', id);
+  // ★ 값 수정 핸들러 (통합)
+  const handleUpdate = async (id: number, field: string, value: any) => {
+    // 화면 즉시 반영
+    setProcedures(procedures.map(item => item.id === id ? { ...item, [field]: value } : item));
+    
+    // DB 업데이트
+    await supabase.from('procedures').update({ [field]: value }).eq('id', id);
+  };
+
+  // 병원 리스트 수정 (텍스트 -> 배열 변환)
+  const handleClinicUpdate = async (id: number, text: string) => {
+    // 콤마로 나눠서 배열로 저장
+    const clinicArray = text.split(',').map(c => c.trim());
+    handleUpdate(id, 'clinics', clinicArray);
+  };
+
+  const handleDeleteProcedure = async (id: number) => {
+    if (!confirm("삭제하시겠습니까?")) return;
+    setProcedures(procedures.filter(p => p.id !== id));
+    await supabase.from('procedures').delete().eq('id', id);
+  };
+  
+  const handleDeleteReservation = async (id: number) => {
+    if (!confirm("삭제하시겠습니까?")) return;
+    setReservations(reservations.filter(r => r.id !== id));
+    await supabase.from('reservations').delete().eq('id', id);
   };
 
   const handleStatusChange = async (id: number, newStatus: string) => {
@@ -41,42 +63,16 @@ export default function AdminPage() {
     await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
   };
 
-  // ★ 시술 삭제 함수 (NEW)
-  const handleDeleteProcedure = async (id: number) => {
-    if (!confirm("정말 이 시술 정보를 삭제하시겠습니까? (복구 불가)")) return;
-    
-    // 1. 화면에서 즉시 제거
-    setProcedures(procedures.filter(p => p.id !== id));
-    
-    // 2. DB에서 삭제
-    const { error } = await supabase.from('procedures').delete().eq('id', id);
-    if (error) {
-        alert("삭제 실패!");
-        console.error(error);
-        fetchAllData(); // 에러나면 다시 불러오기
-    }
-  };
-
-  // ★ 예약 내역 삭제 함수 (NEW)
-  const handleDeleteReservation = async (id: number) => {
-    if (!confirm("이 예약 내역을 영구 삭제하시겠습니까?")) return;
-    setReservations(reservations.filter(r => r.id !== id));
-    await supabase.from('reservations').delete().eq('id', id);
-  };
-
   const handleFileUpload = (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async (evt: any) => {
       const bstr = evt.target.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
+      const ws = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(ws);
-
-      if (confirm(`${data.length}개의 시술 데이터를 DB에 추가하시겠습니까?`)) {
+      if (confirm(`${data.length}개 업로드 하시겠습니까?`)) {
         const formattedData = data.map((row: any) => ({
             name: row.name,
             rank: row.rank || 99,
@@ -86,16 +82,8 @@ export default function AdminPage() {
             clinics: row.clinics ? row.clinics.split(',').map((c:string) => c.trim()) : [],
             is_hot: row.is_hot === 'TRUE' || row.is_hot === true
         }));
-
         const { error } = await supabase.from('procedures').insert(formattedData);
-
-        if (error) {
-            alert("업로드 실패! 엑셀 형식을 확인해주세요.");
-            console.error(error);
-        } else {
-            alert("업로드 성공! 새로고침합니다.");
-            window.location.reload();
-        }
+        if (!error) window.location.reload();
       }
     };
     reader.readAsBinaryString(file);
@@ -111,142 +99,93 @@ export default function AdminPage() {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-        <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', background:'#f0f2f5'}}>
-          <div style={{padding:'40px', background:'white', border:'1px solid #ddd', borderRadius:'10px', textAlign:'center', boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
-            <h2 style={{marginBottom:'20px', color:'#102A43'}}>Admin Login</h2>
-            <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Password" style={{display:'block', margin:'10px auto', padding:'12px', width:'250px', border:'1px solid #ddd', borderRadius:'6px'}} />
-            <button onClick={handleLogin} style={{padding:'12px 20px', width:'250px', background:'#102A43', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Login</button>
-          </div>
+  if (!isAuthenticated) return (
+    <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>
+        <div style={{padding:'40px', border:'1px solid #ddd', borderRadius:'10px', textAlign:'center'}}>
+            <h2>Admin Login</h2>
+            <input type="password" onChange={(e)=>setPassword(e.target.value)} style={{display:'block', margin:'10px auto', padding:'10px'}} />
+            <button onClick={handleLogin} style={{padding:'10px 20px', background:'#102A43', color:'white', border:'none'}}>Login</button>
         </div>
-      );
-  }
+    </div>
+  );
 
   return (
     <div style={{padding:'40px 5%', width:'100%', minHeight:'100vh', background:'#f8f9fa'}}>
-      
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
-        <div>
-            <h1 style={{color:'#102A43', marginBottom:'5px'}}>🔧 Admin Dashboard</h1>
-            <p style={{color:'#666', fontSize:'0.9rem'}}>Real-time Database Management</p>
-        </div>
+      <div style={{display:'flex', justifyContent:'space-between', marginBottom:'30px'}}>
+        <h1>🔧 Admin Dashboard</h1>
         <div style={{display:'flex', gap:'10px'}}>
-             <label style={{
-                background:'#2e7d32', color:'white', padding:'10px 20px', 
-                borderRadius:'30px', fontWeight:'bold', cursor:'pointer', 
-                display:'flex', alignItems:'center', gap:'5px'
-             }}>
-                <i className="fa-solid fa-file-excel"></i> Excel Upload
-                <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{display:'none'}} />
+             <label style={{background:'#2e7d32', color:'white', padding:'10px 20px', borderRadius:'30px', cursor:'pointer'}}>
+                Excel Upload <input type="file" onChange={handleFileUpload} style={{display:'none'}} />
              </label>
-
-            <Link href="/" style={{textDecoration:'none', background:'white', padding:'10px 20px', borderRadius:'30px', border:'1px solid #ddd', fontWeight:'bold', color:'#102A43', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                View Live Site <i className="fa-solid fa-arrow-up-right-from-square" style={{marginLeft:'5px'}}></i>
-            </Link>
+            <Link href="/" style={{background:'white', padding:'10px 20px', borderRadius:'30px', border:'1px solid #ddd'}}>View Site</Link>
         </div>
       </div>
 
-      {/* 예약 현황 섹션 */}
-      <section style={{marginBottom:'40px', background:'white', padding:'30px', borderRadius:'16px', boxShadow:'0 2px 10px rgba(0,0,0,0.03)'}}>
-        <h2 style={{borderBottom:'2px solid #00B4D8', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>📋 Reservation Management</h2>
-        <div style={{width:'100%'}}>
-            <table style={{width:'100%', borderCollapse:'collapse'}}>
-                <thead>
-                    <tr style={{background:'#F0F4F8', color:'#486581'}}>
-                        <th style={{padding:'15px', textAlign:'left', borderRadius:'8px 0 0 8px'}}>Date</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Customer</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Contact Info</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Target Procedure</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Status</th>
-                        <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Action</th>
+      {/* 예약 관리 */}
+      <section style={{marginBottom:'40px', background:'white', padding:'30px', borderRadius:'16px'}}>
+        <h2>📋 Reservations</h2>
+        <table style={{width:'100%', marginTop:'10px'}}>
+            <tbody>
+                {reservations.map((res) => (
+                    <tr key={res.id} style={{borderBottom:'1px solid #eee'}}>
+                        <td style={{padding:'10px'}}>{res.customer_name}</td>
+                        <td style={{padding:'10px'}}>{res.contact_info} ({res.messenger_type})</td>
+                        <td style={{padding:'10px', color:'#00B4D8'}}>{res.procedure_name}</td>
+                        <td style={{padding:'10px'}}>
+                            <select value={res.status} onChange={(e) => handleStatusChange(res.id, e.target.value)}
+                                style={{padding:'5px', background: getStatusColor(res.status).bg, color: getStatusColor(res.status).text, border:'none', borderRadius:'5px'}}>
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </td>
+                        <td><button onClick={()=>handleDeleteReservation(res.id)}>🗑️</button></td>
                     </tr>
-                </thead>
-                <tbody>
-                    {reservations.map((res) => {
-                        const colors = getStatusColor(res.status);
-                        return (
-                            <tr key={res.id} style={{borderBottom:'1px solid #f1f3f5'}}>
-                                <td style={{padding:'15px', fontSize:'0.9rem', color:'#666'}}>{new Date(res.created_at).toLocaleDateString()}</td>
-                                <td style={{padding:'15px', fontWeight:'bold', fontSize:'1rem'}}>{res.customer_name}</td>
-                                <td style={{padding:'15px'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                        <span style={{fontSize:'0.75rem', background:'#e3f2fd', color:'#1565c0', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>{res.messenger_type}</span>
-                                        <span style={{fontSize:'1rem'}}>{res.contact_info}</span>
-                                    </div>
-                                </td>
-                                <td style={{padding:'15px', color:'#00B4D8', fontWeight:'600'}}>{res.procedure_name}</td>
-                                <td style={{padding:'15px'}}>
-                                    <select
-                                        value={res.status}
-                                        onChange={(e) => handleStatusChange(res.id, e.target.value)}
-                                        style={{
-                                            padding: '8px 12px', borderRadius: '20px', border: 'none',
-                                            background: colors.bg, color: colors.text,
-                                            fontWeight: 'bold', cursor: 'pointer', outline: 'none'
-                                        }}
-                                    >
-                                        <option value="Pending">🟠 Pending</option>
-                                        <option value="Confirmed">🟢 Confirmed</option>
-                                        <option value="Completed">🔵 Completed</option>
-                                        <option value="Cancelled">⚪ Cancelled</option>
-                                    </select>
-                                </td>
-                                {/* 예약 삭제 버튼 */}
-                                <td style={{padding:'15px'}}>
-                                    <button onClick={() => handleDeleteReservation(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.1rem'}}>
-                                        <i className="fa-solid fa-trash-can"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+                ))}
+            </tbody>
+        </table>
       </section>
 
-      {/* 시술 관리 섹션 */}
-      <section style={{background:'white', padding:'30px', borderRadius:'16px', boxShadow:'0 2px 10px rgba(0,0,0,0.03)'}}>
-        <h2 style={{borderBottom:'2px solid #102A43', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>💰 Price & Ranking Management</h2>
-        <table style={{width:'100%', borderCollapse:'collapse'}}>
+      {/* 시술 관리 (랭킹 수정 가능) */}
+      <section style={{background:'white', padding:'30px', borderRadius:'16px'}}>
+        <h2>💰 Procedures (Rank & Price)</h2>
+        <table style={{width:'100%', marginTop:'10px'}}>
             <thead>
-            <tr style={{background:'#F0F4F8', color:'#486581'}}>
-                <th style={{padding:'15px', textAlign:'left', width:'80px', borderRadius:'8px 0 0 8px'}}>Rank</th>
-                <th style={{padding:'15px', textAlign:'left'}}>Procedure Name</th>
-                <th style={{padding:'15px', textAlign:'left'}}>Price (KRW)</th>
-                <th style={{padding:'15px', textAlign:'left', borderRadius:'0 8px 8px 0'}}>Action</th>
-            </tr>
+                <tr style={{background:'#eee', textAlign:'left'}}>
+                    <th style={{padding:'10px', width:'60px'}}>Rank</th>
+                    <th style={{padding:'10px'}}>Name</th>
+                    <th style={{padding:'10px'}}>Avg. Price</th>
+                    <th style={{padding:'10px'}}>Clinics (Name:Price)</th>
+                    <th style={{padding:'10px'}}>Action</th>
+                </tr>
             </thead>
             <tbody>
             {procedures.map((item) => (
-                <tr key={item.id} style={{borderBottom:'1px solid #f1f3f5'}}>
-                <td style={{padding:'15px', fontWeight:'bold', color:'#102A43'}}>{item.rank}</td>
-                <td style={{padding:'15px', fontSize:'1rem'}}>{item.name}</td>
-                <td style={{padding:'15px'}}>
-                    <div style={{display:'flex', alignItems:'center'}}>
-                        <span style={{marginRight:'5px', color:'#666'}}>₩</span>
-                        <input 
-                        type="number" 
-                        defaultValue={item.price_krw}
-                        onBlur={(e) => handleSavePrice(item.id, e.target.value)}
-                        style={{padding:'8px', width:'120px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'1rem'}}
-                        />
-                    </div>
-                </td>
-                {/* 시술 삭제 버튼 (빨간색) */}
-                <td style={{padding:'15px'}}>
-                    <button 
-                        onClick={() => handleDeleteProcedure(item.id)}
-                        style={{
-                            background:'#ffebed', color:'#d32f2f', border:'none', 
-                            padding:'8px 12px', borderRadius:'8px', cursor:'pointer', fontWeight:'bold',
-                            display:'flex', alignItems:'center', gap:'5px'
-                        }}
-                    >
-                        <i className="fa-solid fa-trash"></i> Delete
-                    </button>
-                </td>
+                <tr key={item.id} style={{borderBottom:'1px solid #eee'}}>
+                    {/* 1. 랭킹 수정 */}
+                    <td style={{padding:'10px'}}>
+                        <input type="number" defaultValue={item.rank} 
+                        onBlur={(e) => handleUpdate(item.id, 'rank', e.target.value)}
+                        style={{width:'50px', padding:'5px', border:'1px solid #ddd', fontWeight:'bold'}} />
+                    </td>
+                    <td style={{padding:'10px'}}>{item.name}</td>
+                    {/* 2. 평균 가격 수정 */}
+                    <td style={{padding:'10px'}}>
+                        <input type="number" defaultValue={item.price_krw} 
+                        onBlur={(e) => handleUpdate(item.id, 'price_krw', e.target.value)}
+                        style={{width:'100px', padding:'5px', border:'1px solid #ddd'}} />
+                    </td>
+                    {/* 3. 병원 리스트 수정 (텍스트 입력) */}
+                    <td style={{padding:'10px'}}>
+                        <input type="text" defaultValue={item.clinics?.join(', ')} 
+                        onBlur={(e) => handleClinicUpdate(item.id, e.target.value)}
+                        placeholder="병원A:50000, 병원B:60000"
+                        style={{width:'100%', padding:'5px', border:'1px solid #ddd'}} />
+                    </td>
+                    <td style={{padding:'10px'}}>
+                        <button onClick={() => handleDeleteProcedure(item.id)} style={{color:'red'}}>Delete</button>
+                    </td>
                 </tr>
             ))}
             </tbody>
