@@ -16,11 +16,9 @@ type Procedure = {
   is_hot: boolean;
 };
 
-// 스탬프 데이터 (가정)
 const MY_STAMPS = 7;
 const MAX_STAMPS = 10;
 
-// 제휴 병원 데이터
 const PARTNERS = [
   { name: 'MUSE Clinic', category: 'Skin Care', location: 'Gangnam Station' },
   { name: 'ID Hospital', category: 'Plastic Surgery', location: 'Sinsa' },
@@ -33,7 +31,6 @@ const PARTNERS = [
 ];
 
 export default function Home() {
-  // ★ 수정됨 1: 기본 통화를 USD로 변경
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +83,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ★ 순서 1: Loyalty Program (Benefits) */}
+      {/* 1. Loyalty Program */}
       <section id="benefits" style={{background:'#FAFAF9', borderBottom:'1px solid #ddd'}}>
         <div className="container">
             <h2 className="section-title serif" style={{textAlign:'center', marginBottom:'10px'}}>Loyalty Program</h2>
@@ -106,7 +103,6 @@ export default function Home() {
                     </div>
                 </div>
 
-                {/* 스탬프 그리드 */}
                 <div style={{display:'flex', justifyContent:'space-between', gap:'10px', marginBottom:'30px', flexWrap:'wrap'}}>
                     {Array.from({ length: MAX_STAMPS }).map((_, idx) => (
                         <div key={idx} style={{
@@ -122,7 +118,6 @@ export default function Home() {
                     ))}
                 </div>
 
-                {/* 보상 버튼 */}
                 <div style={{textAlign:'center'}}>
                     {currentStamps >= MAX_STAMPS ? (
                         <button style={{
@@ -141,7 +136,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ★ 순서 2: Trending Now (Ranking) */}
+      {/* 2. Trending Now */}
       <section id="ranking">
         <div className="container">
           <div className="section-header">
@@ -185,13 +180,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ★ 순서 3: Official Price List (Prices) */}
+      {/* 3. Official Price List (수정됨: 병원 2개 노출) */}
       <section id="prices" style={{background:'#fafafa'}}>
         <div className="container">
           <div className="section-header">
              <h2 className="section-title serif">Official Price List</h2>
              <div style={{display:'flex', gap:'5px'}}>
-                {/* USD 버튼이 기본으로 활성화(bold) 되도록 조건 수정 */}
                 <button onClick={() => setCurrency('USD')} style={{fontWeight: currency==='USD'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='USD'?'2px solid black':'none'}}>USD</button>
                 <button onClick={() => setCurrency('KRW')} style={{fontWeight: currency==='KRW'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='KRW'?'2px solid black':'none'}}>KRW</button>
              </div>
@@ -203,40 +197,59 @@ export default function Home() {
                 <tr style={{background:'#f9f9f9'}}>
                   <th style={{width:'80px'}}>Rank</th>
                   <th>Procedure</th>
-                  <th>Global Avg.</th>
+                  <th>Top Clinics</th> {/* 컬럼 변경됨 */}
                   <th>Gangnam Price</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {procedures.map((proc) => (
-                  <tr key={proc.id}>
-                    <td style={{fontWeight:'bold', color:'#ccc', fontSize:'1.2rem'}}>{proc.rank}</td>
-                    <td>
-                        <strong style={{fontSize:'1.1rem'}}>{proc.name}</strong>
-                        <div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div>
-                    </td>
-                    {/* 글로벌 평균가는 더 비싸게 가정 */}
-                    <td style={{color:'#aaa', textDecoration:'line-through'}}>{getPrice(proc.price_krw * 2.5)}</td>
-                    <td className="price-tag" style={{color:'#D4AF37'}}>{getPrice(proc.price_krw)}</td>
-                    <td>
-                      <Link href={`/procedures/${proc.id}`}>
-                         <button style={{border:'1px solid #ddd', background:'white', padding:'8px 15px', borderRadius:'20px', fontWeight:'bold', fontSize:'0.8rem'}}>DETAILS</button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {procedures.map((proc) => {
+                  // ★ 병원 이름 2개만 추출
+                  const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
+                  const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
+
+                  return (
+                    <tr key={proc.id}>
+                      <td style={{fontWeight:'bold', color:'#ccc', fontSize:'1.2rem'}}>{proc.rank}</td>
+                      <td>
+                          <strong style={{fontSize:'1.1rem'}}>{proc.name}</strong>
+                          <div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div>
+                      </td>
+                      {/* ★ 병원 리스트 노출 (최대 2개) */}
+                      <td>
+                          {displayedClinics.length > 0 ? (
+                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                                {displayedClinics.map((c, i) => (
+                                    <div key={i} style={{fontSize:'0.9rem', color:'#555', display:'flex', alignItems:'center'}}>
+                                        <i className="fa-solid fa-hospital" style={{fontSize:'0.7rem', color:'#D4AF37', marginRight:'6px'}}></i>
+                                        {c.split(':')[0]}
+                                    </div>
+                                ))}
+                                {extraCount > 0 && <div style={{fontSize:'0.75rem', color:'#aaa', marginLeft:'15px'}}>+ {extraCount} more</div>}
+                            </div>
+                          ) : (
+                            <span style={{color:'#ddd', fontSize:'0.9rem'}}>-</span>
+                          )}
+                      </td>
+                      <td className="price-tag" style={{color:'#D4AF37'}}>{getPrice(proc.price_krw)}</td>
+                      <td>
+                        <Link href={`/procedures/${proc.id}`}>
+                           <button style={{border:'1px solid #ddd', background:'white', padding:'8px 15px', borderRadius:'20px', fontWeight:'bold', fontSize:'0.8rem'}}>DETAILS</button>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      {/* ★ 순서 4: Free Pass Clinics (Partners) - 강조됨 */}
+      {/* 4. Free Pass Clinics (Partners) */}
       <section id="partners">
         <div className="container">
           <div style={{textAlign:'center', marginBottom:'40px'}}>
-             {/* 제목 변경 및 강조 */}
              <h2 className="section-title serif" style={{color:'#D4AF37'}}>Free Pass Clinics</h2>
              <p className="section-subtitle">
                 <strong>Exclusive Benefit:</strong> You can redeem your free procedure at these partner clinics.
@@ -254,11 +267,9 @@ export default function Home() {
                     boxShadow:'0 5px 15px rgba(0,0,0,0.03)',
                     position: 'relative', overflow: 'hidden'
                 }} className="hover-card">
-                   {/* FREE 태그 추가 */}
                    <div style={{position:'absolute', top:'15px', right:'15px', background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>
                        FREE PASS
                    </div>
-
                    <div style={{width:'60px', height:'60px', background:'#f9f9f9', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 20px', color:'#D4AF37'}}>
                         <i className="fa-solid fa-hospital fa-2x"></i>
                    </div>
