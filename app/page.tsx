@@ -16,11 +16,11 @@ type Procedure = {
   is_hot: boolean;
 };
 
-// ★ 수정됨: 베네핏 스탬프 데이터 (10회 방문 로직)
-const MY_STAMPS = 7; // 현재 스탬프 개수 (예: 7개 모음)
+// 스탬프 데이터 (가정)
+const MY_STAMPS = 7;
 const MAX_STAMPS = 10;
 
-// ★ 수정됨: 무료 시술 가능한 제휴 병원 리스트
+// 제휴 병원 데이터
 const PARTNERS = [
   { name: 'MUSE Clinic', category: 'Skin Care', location: 'Gangnam Station' },
   { name: 'ID Hospital', category: 'Plastic Surgery', location: 'Sinsa' },
@@ -33,11 +33,11 @@ const PARTNERS = [
 ];
 
 export default function Home() {
-  const [currency, setCurrency] = useState<'KRW' | 'USD'>('KRW');
+  // ★ 수정됨 1: 기본 통화를 USD로 변경
+  const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 스탬프 관련 상태
   const [currentStamps, setCurrentStamps] = useState(MY_STAMPS);
 
   useEffect(() => {
@@ -67,10 +67,10 @@ export default function Home() {
         <div className="container nav-wrapper">
           <div className="logo serif">K-Beauty <span style={{fontStyle:'italic', color:'#D4AF37'}}>Insider</span></div>
           <nav className="nav-menu">
-            <a href="#benefits">My Benefits</a>
-            <a href="#partners">Free Pass Clinic</a>
+            <a href="#benefits">Loyalty</a>
             <a href="#ranking">Trends</a>
             <a href="#prices">Prices</a>
+            <a href="#partners" style={{color:'#D4AF37', fontWeight:'bold'}}>Free Pass</a>
             <a href="/admin" style={{marginLeft:'20px', color:'#ccc'}}><i className="fa-solid fa-gear"></i></a>
           </nav>
         </div>
@@ -86,7 +86,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ★ 1. Benefit Section (스탬프 기능으로 수정됨) */}
+      {/* ★ 순서 1: Loyalty Program (Benefits) */}
       <section id="benefits" style={{background:'#FAFAF9', borderBottom:'1px solid #ddd'}}>
         <div className="container">
             <h2 className="section-title serif" style={{textAlign:'center', marginBottom:'10px'}}>Loyalty Program</h2>
@@ -141,40 +141,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ★ 2. Partner Clinics (무료 시술 가능 병원 선택 리스트) */}
-      <section id="partners">
-        <div className="container">
-          <div style={{textAlign:'center', marginBottom:'40px'}}>
-             <h2 className="section-title serif">Partner Clinics</h2>
-             <p className="section-subtitle">Clinics available for free procedure redemption.</p>
-          </div>
-          
-          {/* 격자형 레이아웃 복구 (박스감 살림) */}
-          <div style={{
-              display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', 
-              gap:'20px'
-          }}>
-             {PARTNERS.map((partner, idx) => (
-                <div key={idx} style={{
-                    background:'white', border:'1px solid #eee', padding:'30px', 
-                    borderRadius:'12px', textAlign:'center', transition:'all 0.3s',
-                    boxShadow:'0 5px 15px rgba(0,0,0,0.03)'
-                }} className="hover-card">
-                   <div style={{width:'60px', height:'60px', background:'#f9f9f9', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 20px', color:'#D4AF37'}}>
-                        <i className="fa-solid fa-hospital fa-2x"></i>
-                   </div>
-                   <h3 style={{fontSize:'1.1rem', fontWeight:'bold', marginBottom:'5px'}}>{partner.name}</h3>
-                   <div style={{fontSize:'0.85rem', color:'#888', marginBottom:'15px'}}>{partner.category}</div>
-                   <div style={{fontSize:'0.8rem', color:'#aaa', borderTop:'1px solid #eee', paddingTop:'15px'}}>
-                        <i className="fa-solid fa-location-dot" style={{marginRight:'5px'}}></i> {partner.location}
-                   </div>
-                </div>
-             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Trending Slider (카드 디자인 복구) */}
+      {/* ★ 순서 2: Trending Now (Ranking) */}
       <section id="ranking">
         <div className="container">
           <div className="section-header">
@@ -192,7 +159,6 @@ export default function Home() {
             <div className="slider-track" id="trendSlider">
               {trendingProcedures.map((proc) => (
                 <Link href={`/procedures/${proc.id}`} key={proc.id} style={{textDecoration:'none'}}>
-                    {/* 카드 박스 스타일 복구 */}
                     <article className="procedure-card" style={{
                         minWidth:'320px', background:'white', border:'1px solid #eee', 
                         borderRadius:'12px', padding:'25px', boxShadow:'0 5px 20px rgba(0,0,0,0.05)',
@@ -219,14 +185,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. Price List Table */}
+      {/* ★ 순서 3: Official Price List (Prices) */}
       <section id="prices" style={{background:'#fafafa'}}>
         <div className="container">
           <div className="section-header">
              <h2 className="section-title serif">Official Price List</h2>
              <div style={{display:'flex', gap:'5px'}}>
-                <button onClick={() => setCurrency('KRW')} style={{fontWeight: currency==='KRW'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='KRW'?'2px solid black':'none'}}>KRW</button>
+                {/* USD 버튼이 기본으로 활성화(bold) 되도록 조건 수정 */}
                 <button onClick={() => setCurrency('USD')} style={{fontWeight: currency==='USD'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='USD'?'2px solid black':'none'}}>USD</button>
+                <button onClick={() => setCurrency('KRW')} style={{fontWeight: currency==='KRW'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='KRW'?'2px solid black':'none'}}>KRW</button>
              </div>
           </div>
 
@@ -249,7 +216,8 @@ export default function Home() {
                         <strong style={{fontSize:'1.1rem'}}>{proc.name}</strong>
                         <div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div>
                     </td>
-                    <td style={{color:'#aaa', textDecoration:'line-through'}}>{getPrice(proc.price_krw * 1.5)}</td>
+                    {/* 글로벌 평균가는 더 비싸게 가정 */}
+                    <td style={{color:'#aaa', textDecoration:'line-through'}}>{getPrice(proc.price_krw * 2.5)}</td>
                     <td className="price-tag" style={{color:'#D4AF37'}}>{getPrice(proc.price_krw)}</td>
                     <td>
                       <Link href={`/procedures/${proc.id}`}>
@@ -260,6 +228,47 @@ export default function Home() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      {/* ★ 순서 4: Free Pass Clinics (Partners) - 강조됨 */}
+      <section id="partners">
+        <div className="container">
+          <div style={{textAlign:'center', marginBottom:'40px'}}>
+             {/* 제목 변경 및 강조 */}
+             <h2 className="section-title serif" style={{color:'#D4AF37'}}>Free Pass Clinics</h2>
+             <p className="section-subtitle">
+                <strong>Exclusive Benefit:</strong> You can redeem your free procedure at these partner clinics.
+             </p>
+          </div>
+          
+          <div style={{
+              display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', 
+              gap:'20px'
+          }}>
+             {PARTNERS.map((partner, idx) => (
+                <div key={idx} style={{
+                    background:'white', border:'1px solid #eee', padding:'30px', 
+                    borderRadius:'12px', textAlign:'center', transition:'all 0.3s',
+                    boxShadow:'0 5px 15px rgba(0,0,0,0.03)',
+                    position: 'relative', overflow: 'hidden'
+                }} className="hover-card">
+                   {/* FREE 태그 추가 */}
+                   <div style={{position:'absolute', top:'15px', right:'15px', background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>
+                       FREE PASS
+                   </div>
+
+                   <div style={{width:'60px', height:'60px', background:'#f9f9f9', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 20px', color:'#D4AF37'}}>
+                        <i className="fa-solid fa-hospital fa-2x"></i>
+                   </div>
+                   <h3 style={{fontSize:'1.1rem', fontWeight:'bold', marginBottom:'5px'}}>{partner.name}</h3>
+                   <div style={{fontSize:'0.85rem', color:'#888', marginBottom:'15px'}}>{partner.category}</div>
+                   <div style={{fontSize:'0.8rem', color:'#aaa', borderTop:'1px solid #eee', paddingTop:'15px'}}>
+                        <i className="fa-solid fa-location-dot" style={{marginRight:'5px'}}></i> {partner.location}
+                   </div>
+                </div>
+             ))}
           </div>
         </div>
       </section>
