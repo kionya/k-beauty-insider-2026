@@ -1,295 +1,161 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Playfair+Display:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
-  /* 고급스러운 컬러 팔레트 */
-  --primary-navy: #0F172A;     /* 깊은 네이비 (신뢰) */
-  --accent-gold: #C5A059;      /* 샴페인 골드 (럭셔리) */
-  --bg-cream: #FAFAF9;         /* 따뜻한 크림 화이트 (피부톤) */
-  --text-dark: #334155;        /* 진한 회색 (가독성) */
-  --text-light: #64748B;       /* 연한 회색 (보조) */
-  --white: #FFFFFF;
+  --black: #1a1a1a;
+  --gold: #D4AF37;       /* 리얼 샴페인 골드 */
+  --gold-light: #F9F1D8; /* 연한 골드 배경 */
+  --gray: #888888;
+  --light-gray: #f5f5f5;
+  --white: #ffffff;
+  --border: #e0e0e0;
 }
 
-* {
-  box-sizing: border_box;
-  padding: 0;
-  margin: 0;
-}
+* { box-sizing: border-box; padding: 0; margin: 0; }
 
 body {
-  font-family: 'Noto Sans KR', sans-serif;
-  background-color: var(--bg-cream);
-  color: var(--text-dark);
+  font-family: 'Manrope', sans-serif; /* 모던한 산세리프 */
+  background-color: var(--white);
+  color: var(--black);
   line-height: 1.6;
 }
 
-/* --- 타이포그래피 --- */
-h1, h2, h3, .logo-font {
-  font-family: 'Playfair Display', serif; /* 명조체로 우아하게 */
+h1, h2, h3, .serif {
+  font-family: 'Playfair Display', serif; /* 명품 스타일 명조체 */
 }
 
-a { text-decoration: none; color: inherit; }
+a { text-decoration: none; color: inherit; transition: all 0.3s; }
 ul { list-style: none; }
+button { font-family: 'Manrope', sans-serif; cursor: pointer; border: none; }
 
-/* --- 레이아웃 컨테이너 --- */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* --- 버튼 공통 스타일 --- */
-button {
-  font-family: 'Noto Sans KR', sans-serif;
-  transition: all 0.3s ease;
-}
-
-/* --- 1. 헤더 (Header) --- */
+/* --- 헤더 --- */
 header {
-  background-color: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: 15px 0;
+  padding: 20px 0;
 }
+.nav-wrapper { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.5px; }
+.nav-menu a { margin-left: 25px; font-size: 0.9rem; font-weight: 500; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; }
+.nav-menu a:hover { color: var(--black); }
 
-.nav-wrapper {
+/* --- 히어로 섹션 (잡지 표지 스타일) --- */
+.hero {
+  padding: 120px 0 80px;
+  text-align: center;
+  background: linear-gradient(to bottom, #fff 0%, #fafafa 100%);
+}
+.hero-category {
+  color: var(--gold);
+  font-weight: 600;
+  letter-spacing: 3px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  display: block;
+}
+.hero h1 {
+  font-size: 4.5rem;
+  line-height: 1.1;
+  margin-bottom: 30px;
+  color: var(--black);
+}
+.hero p {
+  font-size: 1.2rem;
+  color: var(--gray);
+  max-width: 500px;
+  margin: 0 auto 40px;
+  font-weight: 300;
+}
+.btn-primary {
+  padding: 15px 40px;
+  background: var(--black);
+  color: var(--white);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+}
+.btn-primary:hover { background: var(--gold); color: var(--black); }
+
+/* --- 섹션 공통 --- */
+section { padding: 80px 0; border-bottom: 1px solid var(--light-gray); }
+.section-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; }
+.section-title { font-size: 2.5rem; line-height: 1.2; }
+.section-subtitle { color: var(--gray); margin-top: 10px; }
+
+/* --- 1. 쿠폰 섹션 (NEW) --- */
+.coupon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 30px;
+}
+.coupon-card {
+  background: var(--white);
+  border: 1px solid var(--gold);
+  padding: 30px;
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  transition: transform 0.3s;
+}
+.coupon-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15); }
+.coupon-left h3 { font-size: 1.8rem; color: var(--gold); margin-bottom: 5px; }
+.coupon-left p { color: var(--gray); font-size: 0.9rem; }
+.coupon-right button {
+  background: var(--black);
+  color: white;
+  padding: 10px 20px;
+  font-size: 0.8rem;
 }
 
-.logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary-navy);
-  letter-spacing: -0.5px;
+/* --- 2. 병원 리스트 (NEW) --- */
+.partner-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border); /* 격자무늬 효과 */
+  border: 1px solid var(--border);
 }
-.logo span { color: var(--accent-gold); }
-
-.nav-menu a {
-  margin-left: 30px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text-dark);
-  transition: color 0.3s;
-}
-.nav-menu a:hover { color: var(--accent-gold); }
-
-/* --- 2. 히어로 섹션 (Hero) --- */
-.hero {
-  background: linear-gradient(135deg, var(--primary-navy) 0%, #1E293B 100%);
-  color: var(--white);
-  padding: 100px 0;
+.partner-item {
+  background: var(--white);
+  padding: 40px 20px;
   text-align: center;
-}
-
-.hero h1 {
-  font-size: 3.5rem;
-  margin-bottom: 20px;
-  line-height: 1.2;
-  color: var(--accent-gold); /* 골드 포인트 */
-}
-
-.hero p {
-  font-size: 1.1rem;
-  opacity: 0.8;
-  font-weight: 300;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-/* --- 3. 슬라이더 (Cards) --- */
-.section-title {
-  text-align: center;
-  font-size: 2.2rem;
-  color: var(--primary-navy);
-  margin-bottom: 40px;
-  position: relative;
-  display: inline-block;
-}
-.section-title::after {
-  content: '';
-  display: block;
-  width: 50px;
-  height: 3px;
-  background: var(--accent-gold);
-  margin: 15px auto 0;
-}
-
-.slider-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  position: relative;
-  padding: 20px 0;
+  justify-content: center;
+  transition: all 0.3s;
 }
+.partner-item:hover { background: #fafafa; }
+.partner-logo { font-size: 2rem; color: var(--gold); margin-bottom: 15px; }
+.partner-name { font-weight: 600; font-size: 1rem; }
 
-.slider-track {
-  display: flex;
-  gap: 25px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 10px 5px; /* 그림자 잘림 방지 */
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* --- 3. 슬라이더 & 가격표 (기존 유지 + 디자인 변경) --- */
+.slider-container { position: relative; overflow: hidden; }
+.slider-track { display: flex; gap: 30px; overflow-x: auto; scrollbar-width: none; padding: 20px 5px; }
 .slider-track::-webkit-scrollbar { display: none; }
 
 .procedure-card {
-  min-width: 300px;
+  min-width: 320px;
   background: var(--white);
-  border-radius: 12px; /* 둥근 모서리 */
-  padding: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); /* 부드러운 그림자 */
-  border: 1px solid rgba(0,0,0,0.03);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  padding: 0;
+  border-right: 1px solid var(--light-gray); /* 옆선만 */
 }
+.card-rank { font-size: 4rem; color: var(--light-gray); font-family: 'Playfair Display'; line-height: 1; margin-bottom: -20px; position: relative; z-index: 0; }
+.card-content { position: relative; z-index: 1; padding-top: 20px; }
 
-.procedure-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 40px rgba(197, 160, 89, 0.15); /* 골드 빛 그림자 */
-  border-color: var(--accent-gold);
-}
-
-.card-header h3 {
-  font-size: 1.4rem;
-  color: var(--primary-navy);
-  margin-bottom: 5px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.badge-hot {
-  background-color: var(--accent-gold);
-  color: white;
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.rank-badge {
-  font-size: 3rem;
-  font-weight: 700;
-  color: rgba(0,0,0,0.03); /* 배경처럼 은은하게 */
-  position: absolute;
-  top: 10px;
-  right: 20px;
-  font-family: 'Playfair Display', serif;
-  pointer-events: none;
-}
-
-.context-label {
-  font-size: 0.75rem;
-  color: var(--accent-gold);
-  font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 5px;
-  letter-spacing: 1px;
-}
-
-.context-text {
-  font-size: 0.95rem;
-  color: var(--text-light);
-  line-height: 1.5;
-  min-height: 45px;
-}
-
-.card-footer {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: var(--primary-navy);
-}
-
-.slider-btn {
-  background: white;
-  border: 1px solid #eee;
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--primary-navy);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  z-index: 10;
-}
-.slider-btn:hover {
-  background: var(--primary-navy);
-  color: white;
-}
-
-/* --- 4. 가격표 (Price Table) --- */
-.price-table-wrapper {
-  background: var(--white);
-  border-radius: 16px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.03);
-  overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.05);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-thead {
-  background-color: #F8FAFC;
-  border-bottom: 2px solid var(--primary-navy);
-}
-
-th {
-  padding: 20px;
-  text-align: left;
-  font-weight: 600;
-  color: var(--primary-navy);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-td {
-  padding: 20px;
-  border-bottom: 1px solid #f1f1f1;
-  color: var(--text-dark);
-}
-
-tr:hover { background-color: #FAFAF9; }
-
-.toggle-btn {
-  padding: 8px 20px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #888;
-  cursor: pointer;
-  border-radius: 30px;
-  font-size: 0.9rem;
-  margin-left: 10px;
-}
-
-.toggle-btn.active {
-  background: var(--primary-navy);
-  color: white;
-  border-color: var(--primary-navy);
-}
-
-.clinic-item {
-  display: inline-block;
-  background: #F1F5F9;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  color: var(--text-dark);
-  margin-right: 5px;
-  margin-bottom: 5px;
-}
-.clinic-icon { color: var(--accent-gold); margin-right: 5px; }
+/* 가격표 테이블 */
+.price-table-wrapper table { width: 100%; border-collapse: collapse; }
+.price-table-wrapper th { text-align: left; padding: 20px; border-bottom: 2px solid var(--black); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+.price-table-wrapper td { padding: 25px 20px; border-bottom: 1px solid var(--light-gray); }
+.price-tag { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 600; }
