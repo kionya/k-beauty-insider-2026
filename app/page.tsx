@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase'; // 진짜 DB 도구 가져오기
+import Link from 'next/link';
 
 // 데이터 타입 정의
 type Procedure = {
@@ -112,32 +113,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trending Slider */}
+      {/* 2. Trending Slider (Link 추가된 버전) */}
       <section id="ranking" className="ranking-section">
         <div className="container">
           <h2 className="section-title">Trending This Month</h2>
           <div className="slider-container">
             <button className="slider-btn prev" onClick={() => scrollSlider(-1)}><i className="fa-solid fa-chevron-left"></i></button>
+            
             <div className="slider-track" id="trendSlider">
               {trendingProcedures.map((proc) => (
-                <article className="procedure-card" key={proc.id}>
-                  <div className="card-header">
-                    <h3>{proc.name} {proc.is_hot && <span className="badge badge-hot">HOT</span>}</h3>
-                    <div className="rank-badge">{proc.rank}</div>
-                  </div>
-                  <div className="context-table">
-                    <div className="context-row">
-                      <div className="context-label">DESC</div>
-                      <div className="context-text">{proc.description}</div>
-                    </div>
-                  </div>
-                  <div className="card-footer">
-                    <span>Avg. Price</span>
-                    <span>{getPrice(proc.price_krw)} ~</span>
-                  </div>
-                </article>
+                /* ▼▼▼ 여기서부터 Link 태그가 감싸도록 수정됨 ▼▼▼ */
+                <Link href={`/procedures/${proc.id}`} key={proc.id} style={{textDecoration:'none'}}>
+                    <article className="procedure-card" style={{height:'100%', cursor:'pointer'}}>
+                      <div className="card-header">
+                        <h3>{proc.name} {proc.is_hot && <span className="badge badge-hot">HOT</span>}</h3>
+                        <div className="rank-badge">{proc.rank}</div>
+                      </div>
+                      <div className="context-table">
+                        <div className="context-row">
+                          <div className="context-label">DESC</div>
+                          <div className="context-text">{proc.description}</div>
+                        </div>
+                      </div>
+                      <div className="card-footer">
+                        <span>Avg. Price</span>
+                        <span>{getPrice(proc.price_krw)} ~</span>
+                      </div>
+                    </article>
+                </Link>
+                /* ▲▲▲ 여기까지 ▲▲▲ */
               ))}
             </div>
+            
             <button className="slider-btn next" onClick={() => scrollSlider(1)}><i className="fa-solid fa-chevron-right"></i></button>
           </div>
         </div>
