@@ -16,6 +16,8 @@ type Procedure = {
   is_hot: boolean;
 };
 
+type SortMode = 'rank' | 'price_low' | 'price_high' | 'hot';
+
 const MY_STAMPS = 7;
 const MAX_STAMPS = 10;
 
@@ -34,12 +36,30 @@ export default function Home() {
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [currentStamps] = useState(MY_STAMPS);
 
-  // pagination
+  // ✅ Mobile hamburger
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // ✅ Exchange rate: ENV 기본값 + Supabase settings override
+  const [exchangeRate, setExchangeRate] = useState<number>(
+    Number(process.env.NEXT_PUBLIC_EXCHANGE_RATE ?? 1400)
+  );
+
+  // ✅ Prices: filter + sort (완성형)
+  const [q, setQ] = useState('');
+  const [category, setCategory] = useState<string>('All');
+  const [hotOnly, setHotOnly] = useState(false);
+  const [maxPriceKrw, setMaxPriceKrw] = useState<number>(0);
+  const [priceCapKrw, setPriceCapKrw] = useState<number>(0);
+  const [sortMode, setSortMode] = useState<SortMode>('rank');
+
+  // ✅ Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // 1) Load procedures
   useEffect(() => {
     const fetchData = async () => {
       const { data } = await supabase
@@ -47,34 +67,151 @@ export default function Home() {
         .select('*')
         .order('rank', { ascending: true });
 
-      if (data) setProcedures(data as Procedure[]);
+      if (data) {
+        const typed = data as Procedure[];
+        setProcedures(typed);
+
+        const maxK = Math.max(...typed.map((p) => p.price_krw || 0), 0);
+        setMaxPriceKrw(maxK);
+        setPriceCapKrw(maxK);
+      }
+
       setLoading(false);
     };
 
     fetchData();
   }, []);
 
-  const EXCHANGE_RATE = 1400;
+  // 2) Load exchange rate (optional override from Supabase settings table)
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'exchange_rate')
+        .single();
+
+      if (!error && data?.value) {
+        setExchangeRate(Number(data.value));
+      }
+    };
+
+    fetchExchangeRate();
+  }, []);
+
   const getPrice = (krwPrice: number) =>
-    currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / EXCHANGE_RATE)}`;
+    currency === 'KRW'
+      ? `₩${krwPrice.toLocaleString()}`
+      : `$${Math.round(krwPrice / (exchangeRate || 1400))}`;
 
   const scrollSlider = (direction: number) => {
     const slider = document.getElementById('trendSlider');
     if (slider) slider.scrollBy({ left: direction * 360, behavior: 'smooth' });
   };
 
-  // page calculation
+  // ✅ (A) categories
+  const categories = Array.from(
+    new Set(procedures.map((p) => p.category).filter(Boolean))
+  );
+
+  // ✅ (B) filter + sort (완성형)
+  const filteredAndSorted = (() => {
+    const qq = q.trim().toLowerCase();
+
+    const base = procedures.filter((p) => {
+      const matchesQ =
+        qq === '' ||
+        p.name.toLowerCase().includes(qq) ||
+        (p.description ?? '').toLowerCase().includes(qq);
+
+      const matchesCategory = category === 'All' || p.category === category;
+      const matchesHot = !hotOnly || p.is_hot;
+      const matchesPrice = (p.price_krw ?? 0) <= (priceCapKrw || 0);
+
+      return matchesQ && matchesCategory && matchesHot && matchesPrice;
+    });
+
+    const hotFirst = (a: Procedure, b: Procedure) =>
+      a.is_hot === b.is_hot ? 0 : a.is_hot ? -1 : 1;
+
+    const rankAsc = (a: Procedure, b: Procedure) =>
+      (a.rank ?? 9999) - (b.rank ?? 9999);
+
+    const priceAsc = (a: Procedure, b: Procedure) =>
+      (a.price_krw ?? 0) - (b.price_krw ?? 0);
+
+    const priceDesc = (a: Procedure, b: Procedure) =>
+      (b.price_krw ?? 0) - (a.price_krw ?? 0);
+
+    const sorted = [...base];
+
+    if (sortMode === 'rank') {
+      // 랭크 우선 → HOT 우선 → 가격 낮은 순
+      sorted.sort((a, b) => {
+        const r = rankAsc(a, b);
+        if (r !== 0) return r;
+        const h = hotFirst(a, b);
+        if (h !== 0) return h;
+        return priceAsc(a, b);
+      });
+    } else if (sortMode === 'price_low') {
+      // 가격 낮은 순 → HOT 우선 → 랭크
+      sorted.sort((a, b) => {
+        const p = priceAsc(a, b);
+        if (p !== 0) return p;
+        const h = hotFirst(a, b);
+        if (h !== 0) return h;
+        return rankAsc(a, b);
+      });
+    } else if (sortMode === 'price_high') {
+      // 가격 높은 순 → HOT 우선 → 랭크
+      sorted.sort((a, b) => {
+        const p = priceDesc(a, b);
+        if (p !== 0) return p;
+        const h = hotFirst(a, b);
+        if (h !== 0) return h;
+        return rankAsc(a, b);
+      });
+    } else {
+      // hot: HOT 우선 → 랭크 → 가격 낮은 순
+      sorted.sort((a, b) => {
+        const h = hotFirst(a, b);
+        if (h !== 0) return h;
+        const r = rankAsc(a, b);
+        if (r !== 0) return r;
+        return priceAsc(a, b);
+      });
+    }
+
+    return sorted;
+  })();
+
+  // ✅ (C) filter/sort 변경 시 페이지 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, category, hotOnly, priceCapKrw, sortMode]);
+
+  // ✅ (D) pagination (filteredAndSorted 기준)
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = procedures.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(procedures.length / itemsPerPage);
+  const currentItems = filteredAndSorted.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
 
   const handleNextPage = () => currentPage < totalPages && setCurrentPage((p) => p + 1);
   const handlePrevPage = () => currentPage > 1 && setCurrentPage((p) => p - 1);
 
   if (loading) {
     return (
-      <div className={styles.page} style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'rgba(255,255,255,0.7)' }}>
+      <div
+        className={styles.page}
+        style={{
+          height: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: 'rgba(255,255,255,0.7)',
+        }}
+      >
         Loading...
       </div>
     );
@@ -96,17 +233,72 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Desktop nav */}
           <nav className={styles.nav}>
             <a href="#benefits">Loyalty</a>
             <a href="#ranking">Trends</a>
             <a href="#prices">Prices</a>
-            <a href="#partners" className={styles.navCta}>Free Pass</a>
+            <a href="#partners" className={styles.navCta}>
+              Free Pass
+            </a>
             <a href="/admin" className={styles.iconLink} aria-label="Admin">
               <i className="fa-solid fa-gear"></i>
             </a>
           </nav>
+
+          {/* Mobile hamburger */}
+          <button
+            className={styles.mobileNavBtn}
+            type="button"
+            aria-label="Open menu"
+            onClick={() => setMenuOpen(true)}
+          >
+            <i className="fa-solid fa-bars"></i>
+          </button>
         </div>
       </header>
+
+      {/* Mobile drawer */}
+      {menuOpen && (
+        <div
+          className={styles.drawerOverlay}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setMenuOpen(false)}
+        >
+          <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.drawerTop}>
+              <div style={{ fontWeight: 1000 }}>Menu</div>
+              <button
+                className={styles.detailBtn}
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className={styles.drawerLinks}>
+              <a className={styles.drawerLink} href="#benefits" onClick={() => setMenuOpen(false)}>
+                Loyalty <i className="fa-solid fa-chevron-right"></i>
+              </a>
+              <a className={styles.drawerLink} href="#ranking" onClick={() => setMenuOpen(false)}>
+                Trends <i className="fa-solid fa-chevron-right"></i>
+              </a>
+              <a className={styles.drawerLink} href="#prices" onClick={() => setMenuOpen(false)}>
+                Prices <i className="fa-solid fa-chevron-right"></i>
+              </a>
+              <a className={styles.drawerLink} href="#partners" onClick={() => setMenuOpen(false)}>
+                Free Pass <i className="fa-solid fa-chevron-right"></i>
+              </a>
+              <Link className={styles.drawerLink} href="/admin" onClick={() => setMenuOpen(false)}>
+                Admin <i className="fa-solid fa-gear"></i>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       <section className={styles.hero}>
@@ -154,7 +346,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p className={styles.metricTitle}>Transparent Pricing</p>
-                  <p className={styles.metricText}>KRW / USD toggle with a fixed exchange rate (editable).</p>
+                  <p className={styles.metricText}>KRW / USD toggle with exchange rate from ENV or Supabase settings.</p>
                 </div>
               </div>
 
@@ -270,13 +462,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3) Prices (table -> mobile cards) */}
+      {/* 3) Prices (filter+sort+table->mobile cards) */}
       <section id="prices" className={`${styles.section} ${styles.sectionAlt}`}>
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
               <h2 className={`${styles.title} serif`}>Official Price List</h2>
-              <p className={styles.subtitle}>Desktop table, mobile auto-cards. Paginated (10 per page).</p>
+              <p className={styles.subtitle}>Search/Filter/Sort + Desktop table, Mobile auto-cards. Paginated (10 per page).</p>
             </div>
 
             <div className={styles.controlsRow}>
@@ -301,6 +493,86 @@ export default function Home() {
                 <i className="fa-solid fa-layer-group"></i> {procedures.length} Procedures
               </span>
             </div>
+          </div>
+
+          {/* ✅ Filters + Sort (NEW, 여기만 보면 됨) */}
+          <div className={styles.filters} style={{ marginBottom: 12 }}>
+            <input
+              className={styles.input}
+              placeholder="Search procedure..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+
+            <select
+              className={styles.select}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="All">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={hotOnly}
+                onChange={(e) => setHotOnly(e.target.checked)}
+              />
+              HOT only
+            </label>
+
+            <div className={styles.rangeWrap}>
+              <span className={styles.smallHint}>Up to</span>
+              <input
+                type="range"
+                min={0}
+                max={maxPriceKrw || 0}
+                step={10000}
+                value={priceCapKrw || 0}
+                onChange={(e) => setPriceCapKrw(Number(e.target.value))}
+              />
+              <span className={styles.smallHint}>₩{(priceCapKrw || 0).toLocaleString()}</span>
+            </div>
+
+            <div className={styles.sortGroup} role="tablist" aria-label="Sort prices">
+              <button
+                type="button"
+                className={`${styles.sortBtn} ${sortMode === 'rank' ? styles.sortBtnActive : ''}`}
+                onClick={() => setSortMode('rank')}
+              >
+                Rank
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortBtn} ${sortMode === 'price_low' ? styles.sortBtnActive : ''}`}
+                onClick={() => setSortMode('price_low')}
+              >
+                Price ↑
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortBtn} ${sortMode === 'price_high' ? styles.sortBtnActive : ''}`}
+                onClick={() => setSortMode('price_high')}
+              >
+                Price ↓
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortBtn} ${sortMode === 'hot' ? styles.sortBtnActive : ''}`}
+                onClick={() => setSortMode('hot')}
+              >
+                Hot
+              </button>
+            </div>
+
+            <span className={styles.chip}>
+              <i className="fa-solid fa-filter"></i> {filteredAndSorted.length} results
+            </span>
           </div>
 
           <div className={styles.tableShell}>
@@ -368,7 +640,8 @@ export default function Home() {
                     <div className={styles.priceCardTop}>
                       <div>
                         <h3 className={styles.priceCardTitle}>
-                          #{proc.rank} · {proc.name} {proc.is_hot && <span className={styles.badgeHot} style={{ marginLeft: 8 }}>HOT</span>}
+                          #{proc.rank} · {proc.name}{' '}
+                          {proc.is_hot && <span className={styles.badgeHot} style={{ marginLeft: 8 }}>HOT</span>}
                         </h3>
                         <div className={styles.priceCardMeta}>{proc.category}</div>
                       </div>
@@ -403,15 +676,25 @@ export default function Home() {
 
             {/* Pagination */}
             <div className={styles.pagination}>
-              <button className={styles.pageBtn} onClick={handlePrevPage} disabled={currentPage === 1} type="button">
+              <button
+                className={styles.pageBtn}
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                type="button"
+              >
                 <i className="fa-solid fa-chevron-left"></i> Prev
               </button>
 
               <div className={styles.pageInfo}>
-                Page {currentPage} of {totalPages}
+                Page {currentPage} of {totalPages || 1}
               </div>
 
-              <button className={styles.pageBtn} onClick={handleNextPage} disabled={currentPage === totalPages} type="button">
+              <button
+                className={styles.pageBtn}
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages || totalPages === 0}
+                type="button"
+              >
                 Next <i className="fa-solid fa-chevron-right"></i>
               </button>
             </div>
@@ -424,10 +707,10 @@ export default function Home() {
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
-              <h2 className={`${styles.title} serif`} style={{ color: 'var(--brand)' }}>Free Pass Clinics</h2>
-              <p className={styles.subtitle}>
-                Exclusive Benefit: redeem your free procedure at these partner clinics.
-              </p>
+              <h2 className={`${styles.title} serif`} style={{ color: 'var(--brand)' }}>
+                Free Pass Clinics
+              </h2>
+              <p className={styles.subtitle}>Exclusive Benefit: redeem your free procedure at these partner clinics.</p>
             </div>
             <span className={`${styles.pill} ${styles.pillBrand}`}>
               <i className="fa-solid fa-ticket"></i> FREE PASS
@@ -437,9 +720,7 @@ export default function Home() {
           <div className={styles.partnerGrid}>
             {PARTNERS.map((partner, idx) => (
               <div key={idx} className={styles.partnerCard}>
-                <div className={`${styles.pill} ${styles.pillBrand} ${styles.partnerTag}`}>
-                  FREE PASS
-                </div>
+                <div className={`${styles.pill} ${styles.pillBrand} ${styles.partnerTag}`}>FREE PASS</div>
 
                 <div className={styles.partnerIcon}>
                   <i className="fa-solid fa-hospital"></i>
@@ -464,9 +745,7 @@ export default function Home() {
           <div className={`${styles.footerBrand} serif`}>
             K-Beauty <span style={{ fontStyle: 'italic', color: 'var(--brand)' }}>Insider</span>
           </div>
-          <div style={{ fontSize: 13 }}>
-            &copy; 2026 K-Beauty Insider. Gangnam, Seoul.
-          </div>
+          <div style={{ fontSize: 13 }}>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</div>
         </div>
       </footer>
     </div>
