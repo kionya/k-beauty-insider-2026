@@ -2,8 +2,7 @@
 
 :root {
   --black: #1a1a1a;
-  --gold: #D4AF37;       /* 리얼 샴페인 골드 */
-  --gold-light: #F9F1D8; /* 연한 골드 배경 */
+  --gold: #D4AF37;
   --gray: #888888;
   --light-gray: #f5f5f5;
   --white: #ffffff;
@@ -13,15 +12,13 @@
 * { box-sizing: border-box; padding: 0; margin: 0; }
 
 body {
-  font-family: 'Manrope', sans-serif; /* 모던한 산세리프 */
+  font-family: 'Manrope', sans-serif;
   background-color: var(--white);
   color: var(--black);
   line-height: 1.6;
 }
 
-h1, h2, h3, .serif {
-  font-family: 'Playfair Display', serif; /* 명품 스타일 명조체 */
-}
+h1, h2, h3, .serif { font-family: 'Playfair Display', serif; }
 
 a { text-decoration: none; color: inherit; transition: all 0.3s; }
 ul { list-style: none; }
@@ -33,7 +30,6 @@ button { font-family: 'Manrope', sans-serif; cursor: pointer; border: none; }
   padding: 0 20px;
 }
 
-/* --- 헤더 --- */
 header {
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid var(--border);
@@ -47,114 +43,31 @@ header {
 .nav-menu a { margin-left: 25px; font-size: 0.9rem; font-weight: 500; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; }
 .nav-menu a:hover { color: var(--black); }
 
-/* --- 히어로 섹션 (잡지 표지 스타일) --- */
 .hero {
   padding: 120px 0 80px;
   text-align: center;
   background: linear-gradient(to bottom, #fff 0%, #fafafa 100%);
 }
-.hero-category {
-  color: var(--gold);
-  font-weight: 600;
-  letter-spacing: 3px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-  display: block;
-}
-.hero h1 {
-  font-size: 4.5rem;
-  line-height: 1.1;
-  margin-bottom: 30px;
-  color: var(--black);
-}
-.hero p {
-  font-size: 1.2rem;
-  color: var(--gray);
-  max-width: 500px;
-  margin: 0 auto 40px;
-  font-weight: 300;
-}
-.btn-primary {
-  padding: 15px 40px;
-  background: var(--black);
-  color: var(--white);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  transition: all 0.3s;
-}
+.hero-category { color: var(--gold); font-weight: 600; letter-spacing: 3px; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 20px; display: block; }
+.hero h1 { font-size: 4.5rem; line-height: 1.1; margin-bottom: 30px; color: var(--black); }
+.hero p { font-size: 1.2rem; color: var(--gray); max-width: 500px; margin: 0 auto 40px; font-weight: 300; }
+.btn-primary { padding: 15px 40px; background: var(--black); color: var(--white); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s; }
 .btn-primary:hover { background: var(--gold); color: var(--black); }
 
-/* --- 섹션 공통 --- */
-section { padding: 80px 0; border-bottom: 1px solid var(--light-gray); }
+section { padding: 80px 0; }
 .section-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; }
 .section-title { font-size: 2.5rem; line-height: 1.2; }
 .section-subtitle { color: var(--gray); margin-top: 10px; }
 
-/* --- 1. 쿠폰 섹션 (NEW) --- */
-.coupon-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 30px;
-}
-.coupon-card {
-  background: var(--white);
-  border: 1px solid var(--gold);
-  padding: 30px;
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: transform 0.3s;
-}
-.coupon-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15); }
-.coupon-left h3 { font-size: 1.8rem; color: var(--gold); margin-bottom: 5px; }
-.coupon-left p { color: var(--gray); font-size: 0.9rem; }
-.coupon-right button {
-  background: var(--black);
-  color: white;
-  padding: 10px 20px;
-  font-size: 0.8rem;
-}
-
-/* --- 2. 병원 리스트 (NEW) --- */
-.partner-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--border); /* 격자무늬 효과 */
-  border: 1px solid var(--border);
-}
-.partner-item {
-  background: var(--white);
-  padding: 40px 20px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-}
-.partner-item:hover { background: #fafafa; }
-.partner-logo { font-size: 2rem; color: var(--gold); margin-bottom: 15px; }
-.partner-name { font-weight: 600; font-size: 1rem; }
-
-/* --- 3. 슬라이더 & 가격표 (기존 유지 + 디자인 변경) --- */
+/* 슬라이더 */
 .slider-container { position: relative; overflow: hidden; }
 .slider-track { display: flex; gap: 30px; overflow-x: auto; scrollbar-width: none; padding: 20px 5px; }
 .slider-track::-webkit-scrollbar { display: none; }
 
-.procedure-card {
-  min-width: 320px;
-  background: var(--white);
-  padding: 0;
-  border-right: 1px solid var(--light-gray); /* 옆선만 */
-}
-.card-rank { font-size: 4rem; color: var(--light-gray); font-family: 'Playfair Display'; line-height: 1; margin-bottom: -20px; position: relative; z-index: 0; }
-.card-content { position: relative; z-index: 1; padding-top: 20px; }
+/* 카드에 호버 효과 */
+.hover-card:hover { transform: translateY(-5px); border-color: var(--gold) !important; }
 
-/* 가격표 테이블 */
+/* 가격표 */
 .price-table-wrapper table { width: 100%; border-collapse: collapse; }
 .price-table-wrapper th { text-align: left; padding: 20px; border-bottom: 2px solid var(--black); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
 .price-table-wrapper td { padding: 25px 20px; border-bottom: 1px solid var(--light-gray); }
