@@ -32,6 +32,9 @@ export const metadata: Metadata = {
     description: 'Real prices from Gangnam clinics.',
     images: ['/og-image.png'],
   },
+  verification: {
+    google: 'XO6iCCPRtNaESiPjpDjLSC6nTkVojbv9DvblIu0sGJ8>',
+  },
 };
 
 export default function RootLayout({
