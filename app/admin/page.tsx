@@ -18,6 +18,42 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [stamps, setStamps] = useState<any[]>([]);
 
+   // ✅ 여기(1): helper 함수들 추가 (state 바로 아래)
+  const getAccessToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  };
+
+  const apiFetch = async (url: string, init?: RequestInit) => {
+    const token = await getAccessToken();
+    if (!token) throw new Error('No session');
+
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        ...(init?.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error ?? 'API error');
+    return json;
+  };
+
+  // ✅ 여기(2): fetchAllData에서 apiFetch를 사용하도록 교체
+  const fetchAllData = async () => {
+    const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
+    if (procData) setProcedures(procData);
+
+    const resvJson = await apiFetch('/api/admin/reservations');
+    setReservations(resvJson.data ?? []);
+
+    const stampsJson = await apiFetch('/api/admin/stamps');
+    setStamps(stampsJson.data ?? []);
+  };
+
   const canAccess = useMemo(() => isAdmin || isAuthenticated, [isAdmin, isAuthenticated]);
 
   // 1) Admin role check (Supabase 로그인 기반)
@@ -100,44 +136,47 @@ export default function AdminPage() {
   };
 
   const handleStatusChange = async (id: number, newStatus: string) => {
-    setReservations((prev) => prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res)));
-    await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
+    setReservations(reservations.map(res => (res.id === id ? { ...res, status: newStatus } : res)));
+
+    await apiFetch(`/api/admin/reservations/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: newStatus }),
+    });
   };
 
   const handleDeleteReservation = async (id: number) => {
-    if (!confirm('Delete this reservation?')) return;
-    setReservations((prev) => prev.filter((r) => r.id !== id));
-    await supabase.from('reservations').delete().eq('id', id);
+    if (!confirm("Delete this reservation?")) return;
+
+    setReservations(reservations.filter(r => r.id !== id));
+    await apiFetch(`/api/admin/reservations/${id}`, { method: 'DELETE' });
   };
 
   const handleIssueStamp = async (reservation: any) => {
     if (!confirm(`Issue stamp for ${reservation.customer_name}?`)) return;
 
+    // UI 차원에서 미리 차단(최종 강제는 DB 트리거/서버)
     if (!reservation.user_id) {
       alert('Cannot issue stamp: Guest user (No ID linked).');
       return;
     }
 
-    const { data: userRes } = await supabase.auth.getUser();
+    try {
+      const json = await apiFetch('/api/admin/stamps/issue', {
+        method: 'POST',
+        body: JSON.stringify({ reservation_id: reservation.id }),
+      });
 
-    const { data, error } = await supabase
-      .from('stamps')
-      .insert({
-        user_id: reservation.user_id,
-        reservation_id: reservation.id,
-        issued_by: userRes?.user?.id ?? null,
-      })
-      .select();
+      if (json?.data) {
+        setStamps((prev) => [...prev, json.data]);
+      }
 
-    if (error) {
-      alert('Failed to issue stamp.');
-      console.error(error);
-      return;
+      alert('Stamp Issued!');
+    } catch (e: any) {
+      alert(e?.message ?? 'Failed to issue stamp.');
+      console.error(e);
     }
-
-    if (data?.[0]) setStamps((prev) => [...prev, data[0]]);
-    alert('Stamp Issued!');
   };
+
 
   const handleFileUpload = (e: any) => {
     const file = e.target.files?.[0];
