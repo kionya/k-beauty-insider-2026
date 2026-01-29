@@ -23,15 +23,12 @@ export default function ProcedureDetail() {
   
   const [proc, setProc] = useState<Procedure | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // 모달 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // 입력 폼 상태 (메신저 정보 포함)
   const [formData, setFormData] = useState({
     name: '',
-    contact: '',       // 아이디 또는 전화번호
-    messenger: 'KakaoTalk' // 메신저 종류 (기본값)
+    contact: '',
+    messenger: 'KakaoTalk'
   });
 
   useEffect(() => {
@@ -44,7 +41,6 @@ export default function ProcedureDetail() {
     fetchData();
   }, [id]);
 
-  // 예약 데이터 DB 전송
   const submitReservation = async () => {
     if (!formData.name || !formData.contact) {
       alert("Please fill in all fields.");
@@ -64,7 +60,7 @@ export default function ProcedureDetail() {
     } else {
       alert("Request received! We will contact you shortly.");
       setIsModalOpen(false);
-      setFormData({ name: '', contact: '', messenger: 'KakaoTalk' }); // 초기화
+      setFormData({ name: '', contact: '', messenger: 'KakaoTalk' });
     }
   };
 
@@ -136,7 +132,7 @@ export default function ProcedureDetail() {
             </div>
         </div>
 
-        {/* 하단 고정 예약 버튼 */}
+        {/* ★ NEW: 하단 고정 버튼 문구 변경 */}
         <div style={{position:'fixed', bottom:'30px', left:'50%', transform:'translateX(-50%)', width:'90%', maxWidth:'400px', zIndex:50}}>
             <button 
                 onClick={() => setIsModalOpen(true)}
@@ -149,12 +145,12 @@ export default function ProcedureDetail() {
                     cursor:'pointer', textTransform:'uppercase', letterSpacing:'1px'
                 }}
             >
-                Book Consultation
+                Request Free Consultation
             </button>
         </div>
       </div>
 
-      {/* ★ 예약 모달 (메신저 입력 기능 복구됨) */}
+      {/* 예약 모달 */}
       {isModalOpen && (
         <div style={{position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
             <div style={{background: 'white', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
@@ -164,7 +160,6 @@ export default function ProcedureDetail() {
                 <p style={{textAlign:'center', marginBottom:'25px', color:'#666', fontSize:'0.9rem'}}>Leave your contact info.<br/>We will reach out via your preferred messenger.</p>
 
                 <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-                    {/* 이름 입력 */}
                     <div>
                         <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', fontSize:'0.8rem'}}>Full Name</label>
                         <input 
@@ -175,7 +170,6 @@ export default function ProcedureDetail() {
                         />
                     </div>
 
-                    {/* 메신저 종류 선택 (복구됨!) */}
                     <div>
                         <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', fontSize:'0.8rem'}}>Messenger App</label>
                         <select 
@@ -191,7 +185,6 @@ export default function ProcedureDetail() {
                         </select>
                     </div>
 
-                    {/* 아이디 입력 (복구됨!) */}
                     <div>
                         <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', fontSize:'0.8rem'}}>ID / Number</label>
                         <input 
