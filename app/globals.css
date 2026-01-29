@@ -54,6 +54,9 @@
   --radius-sm: 12px;
 
   --container: 1120px;
+
+  --focus-ring: 0 0 0 3px rgba(125,211,252,0.22), 0 0 0 1px rgba(125,211,252,0.38);
+  --focus-ring-brand: 0 0 0 3px rgba(212,175,55,0.22), 0 0 0 1px rgba(212,175,55,0.38);
 }
 
 * { box-sizing: border-box; }
@@ -120,4 +123,19 @@ button {
 .price-table-wrapper {
   overflow-x: auto !important; /* 가로 스크롤 켜기 */
   -webkit-overflow-scrolling: touch; /* 아이폰에서 부드럽게 */
+}
+
+/* 기본 outline 제거 대신 :focus-visible로만 링 표시 */
+:where(button, a, input, select, textarea):focus { outline: none; }
+
+:where(button, a, input, select, textarea):focus-visible{
+  box-shadow: var(--focus-ring);
+  border-color: rgba(125,211,252,0.55) !important;
+}
+
+/* 클릭/터치(마우스)에는 링 안 뜨고, 키보드 탭에만 뜸 */
+@media (prefers-reduced-motion: no-preference){
+  :where(button, a, input, select, textarea){
+    transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+  }
 }
