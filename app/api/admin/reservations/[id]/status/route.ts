@@ -1,4 +1,3 @@
-// app/api/admin/reservations/[id]/status/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { requireAdmin, supabaseAdmin } from '../../../_supabase';
@@ -11,7 +10,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
   const rid = Number(id);
-  if (!Number.isFinite(rid)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  if (!Number.isFinite(rid)) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const status = String(body?.status ?? '');

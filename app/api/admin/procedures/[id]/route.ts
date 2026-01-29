@@ -1,4 +1,3 @@
-// app/api/admin/procedures/[id]/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { requireAdmin, supabaseAdmin } from '../../_supabase';
@@ -11,7 +10,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
   const pid = Number(id);
-  if (!Number.isFinite(pid)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  if (!Number.isFinite(pid)) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  }
 
   const patch = await req.json().catch(() => ({}));
 
@@ -32,7 +33,9 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
   const pid = Number(id);
-  if (!Number.isFinite(pid)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  if (!Number.isFinite(pid)) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  }
 
   const { error } = await supabaseAdmin.from('procedures').delete().eq('id', pid);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
