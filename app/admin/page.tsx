@@ -202,15 +202,16 @@ export default function AdminPage() {
         body: JSON.stringify({ items: formattedData }),
       });
 
-      await fetchAllData(); // ✅ 화면 최신화
-      alert('Upload complete');
+      await fetchAllData();
+      alert('Upload success');
     } catch (e: any) {
       alert(e?.message ?? 'Upload failed');
       console.error(e);
     }
   };
 
-  reader.readAsBinaryString(file); // ✅ 반드시 onload 설정 후, 함수 맨 마지막
+  // ✅ 이 줄은 onload 바깥에 있어야 함 (필수)
+  reader.readAsBinaryString(file);
 };
 
   // ✅ 로딩 화면
