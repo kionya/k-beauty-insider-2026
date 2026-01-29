@@ -44,8 +44,8 @@ export default function AdminPage() {
 
   // ✅ 여기(2): fetchAllData에서 apiFetch를 사용하도록 교체
   const fetchAllData = async () => {
-    const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
-    if (procData) setProcedures(procData);
+    const procJson = await apiFetch('/api/admin/procedures');
+    setProcedures(procJson.data ?? []);
 
     const resvJson = await apiFetch('/api/admin/reservations');
     setReservations(resvJson.data ?? []);
@@ -94,24 +94,12 @@ export default function AdminPage() {
     run();
   }, []);
 
-  // 2) 권한이 확보되면 데이터 로드 (한 번만)
   useEffect(() => {
     if (!canAccess) return;
-
-    const fetchAllData = async () => {
-      const [{ data: procData }, { data: resData }, { data: stampData }] = await Promise.all([
-        supabase.from('procedures').select('*').order('rank', { ascending: true }),
-        supabase.from('reservations').select('*').order('created_at', { ascending: false }),
-        supabase.from('stamps').select('*'),
-      ]);
-
-      if (procData) setProcedures(procData);
-      if (resData) setReservations(resData);
-      if (stampData) setStamps(stampData);
-    };
-
-    fetchAllData();
+    fetchAllData(); // ✅ 위에서 정의한 apiFetch 기반 fetchAllData 호출
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess]);
+
 
   const handleLogin = () => {
     // TODO: 하드코딩 대신 ENV 권장. 일단 현재 패턴 유지.
@@ -121,7 +109,11 @@ export default function AdminPage() {
 
   const handleUpdate = async (id: number, field: string, value: any) => {
     setProcedures((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
-    await supabase.from('procedures').update({ [field]: value }).eq('id', id);
+
+    await apiFetch(`/api/admin/procedures/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ [field]: value }),
+    });
   };
 
   const handleClinicUpdate = async (id: number, text: string) => {
@@ -131,8 +123,10 @@ export default function AdminPage() {
 
   const handleDeleteProcedure = async (id: number) => {
     if (!confirm('Delete this procedure?')) return;
+
     setProcedures((prev) => prev.filter((p) => p.id !== id));
-    await supabase.from('procedures').delete().eq('id', id);
+
+    await apiFetch(`/api/admin/procedures/${id}`, { method: 'DELETE' });
   };
 
   const handleStatusChange = async (id: number, newStatus: string) => {
@@ -179,11 +173,13 @@ export default function AdminPage() {
 
 
   const handleFileUpload = (e: any) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt: any) => {
+  const reader = new FileReader();
+
+  reader.onload = async (evt: any) => {
+    try {
       const bstr = evt.target.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -201,19 +197,21 @@ export default function AdminPage() {
         is_hot: row.is_hot === 'TRUE' || row.is_hot === true,
       }));
 
-      const { error } = await supabase.from('procedures').insert(formattedData);
-      if (error) {
-        alert('Upload failed');
-        console.error(error);
-        return;
-      }
+      await apiFetch('/api/admin/procedures', {
+        method: 'POST',
+        body: JSON.stringify({ items: formattedData }),
+      });
 
-      // reload 대신 다시 fetch 권장하지만, 일단 기존 유지
-      window.location.reload();
-    };
-
-    reader.readAsBinaryString(file);
+      await fetchAllData(); // ✅ 화면 최신화
+      alert('Upload complete');
+    } catch (e: any) {
+      alert(e?.message ?? 'Upload failed');
+      console.error(e);
+    }
   };
+
+  reader.readAsBinaryString(file); // ✅ 반드시 onload 설정 후, 함수 맨 마지막
+};
 
   // ✅ 로딩 화면
   if (loading) {

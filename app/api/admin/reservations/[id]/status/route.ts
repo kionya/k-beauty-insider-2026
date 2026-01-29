@@ -1,24 +1,33 @@
+// app/api/admin/reservations/[id]/status/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requireAdmin } from '../../../_supabase';
+import { requireAdmin, supabaseAdmin } from '../../../_supabase';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PATCH(req: NextRequest, ctx: Ctx) {
   const gate = await requireAdmin(req);
-  if (!gate.ok) return NextResponse.json({ error: 'forbidden' }, { status: gate.status });
+  if (!gate.ok) return gate.res;
 
-  const body = await req.json().catch(() => ({}));
-  const status = String(body?.status ?? '');
+  const { id } = await ctx.params;
+  const rid = Number(id);
+  if (!Number.isFinite(rid)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
-  const allowed = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
-  if (!allowed.includes(status)) {
-    return NextResponse.json({ error: 'invalid status' }, { status: 400 });
+  const body = await req.json().catch(() => null);
+  const status = body?.status as string | undefined;
+
+  const allowed = new Set(['Pending', 'Confirmed', 'Completed', 'Cancelled']);
+  if (!status || !allowed.has(status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
-  const { error } = await gate.supabase
+  const { data, error } = await supabaseAdmin
     .from('reservations')
     .update({ status })
-    .eq('id', Number(params.id));
+    .eq('id', rid)
+    .select('*')
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ data });
 }
