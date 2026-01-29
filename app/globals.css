@@ -11,6 +11,32 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
+  /* Typography scale */
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-28: 28px;
+  --fs-36: 36px;
+  --fs-44: 44px;
+  --fs-52: 52px;
+
+  /* Letter spacing */
+  --ls-tight: -0.04em;
+  --ls-normal: -0.015em;
+  --ls-wide: 0.08em;
+
+  /* Weights */
+  --w-500: 500;
+  --w-600: 600;
+  --w-700: 700;
+  --w-800: 800;
+  --w-900: 900;
 
   --border: rgba(255,255,255,0.10);
   --border-2: rgba(255,255,255,0.14);
@@ -39,8 +65,25 @@ html, body {
   color: var(--text);
   color-scheme: dark;
   font-family: var(--font-sans);
-  font-feature-settings: "cv02","cv03","cv04","cv11";
-  letter-spacing: -0.01em;
+  font-weight: var(--w-500);
+  letter-spacing: var(--ls-normal);
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,h2,h3{
+  letter-spacing: var(--ls-tight);
+}
+
+code, pre, .mono{
+  font-family: var(--font-mono);
+}
+
+/* 숫자/가격/테이블 정렬감 */
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 a { color: inherit; }
@@ -71,4 +114,10 @@ button {
 
 @media (max-width: 640px){
   .container { width: calc(100% - 28px); }
+}
+
+/* 모바일에서 표 가로 스크롤 허용 */
+.price-table-wrapper {
+  overflow-x: auto !important; /* 가로 스크롤 켜기 */
+  -webkit-overflow-scrolling: touch; /* 아이폰에서 부드럽게 */
 }
