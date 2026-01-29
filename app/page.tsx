@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Link from 'next/link';
-import styles from './page.module.css';
 
 type Procedure = {
   id: number;
@@ -16,11 +15,6 @@ type Procedure = {
   is_hot: boolean;
 };
 
-type SortMode = 'rank' | 'price_low' | 'price_high' | 'hot';
-
-const MY_STAMPS = 7;
-const MAX_STAMPS = 10;
-
 const PARTNERS = [
   { name: 'MUSE Clinic', category: 'Skin Care', location: 'Gangnam Station' },
   { name: 'ID Hospital', category: 'Plastic Surgery', location: 'Sinsa' },
@@ -32,429 +26,197 @@ const PARTNERS = [
   { name: 'V.IBE', category: 'Trendy', location: 'Apgujeong' },
 ];
 
+const MAX_STAMPS = 10;
+
 export default function Home() {
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Auth & Stamps
+  const [user, setUser] = useState<any>(null);
+  const [currentStamps, setCurrentStamps] = useState(0);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const [currentStamps] = useState(MY_STAMPS);
-
-  // ✅ Mobile hamburger
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // ✅ Exchange rate: ENV 기본값 + Supabase settings override
-  const [exchangeRate, setExchangeRate] = useState<number>(
-    Number(process.env.NEXT_PUBLIC_EXCHANGE_RATE ?? 1400)
-  );
-
-  // ✅ Prices: filter + sort (완성형)
-  const [q, setQ] = useState('');
-  const [category, setCategory] = useState<string>('All');
-  const [hotOnly, setHotOnly] = useState(false);
-  const [maxPriceKrw, setMaxPriceKrw] = useState<number>(0);
-  const [priceCapKrw, setPriceCapKrw] = useState<number>(0);
-  const [sortMode, setSortMode] = useState<SortMode>('rank');
-
-  // ✅ Pagination
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // 1) Load procedures
+  // DB에서 내 스탬프 개수 가져오기
+  const fetchMyStamps = async (userId: string) => {
+    const { count, error } = await supabase
+      .from('stamps')
+      .select('*', { count: 'exact', head: true }) // 데이터는 안 가져오고 개수만 셈 (빠름)
+      .eq('user_id', userId);
+    
+    if (!error && count !== null) setCurrentStamps(count);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data } = await supabase
-        .from('procedures')
-        .select('*')
-        .order('rank', { ascending: true });
+    const init = async () => {
+      // 1. 시술 데이터
+      const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
+      if (data) setProcedures(data);
 
-      if (data) {
-        const typed = data as Procedure[];
-        setProcedures(typed);
-
-        const maxK = Math.max(...typed.map((p) => p.price_krw || 0), 0);
-        setMaxPriceKrw(maxK);
-        setPriceCapKrw(maxK);
-      }
-
+      // 2. 로그인 세션 체크
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+      if (session?.user) fetchMyStamps(session.user.id);
+      
       setLoading(false);
     };
+    init();
 
-    fetchData();
+    // 3. Auth 상태 변경 감지
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+      if (session?.user) fetchMyStamps(session.user.id);
+      else setCurrentStamps(0);
+    });
+
+    return () => { authListener.subscription.unsubscribe(); };
   }, []);
 
-  // 2) Load exchange rate (optional override from Supabase settings table)
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'exchange_rate')
-        .single();
+  const handleAuth = async () => {
+    if (!email || !password) return alert("Enter email/password");
+    if (authMode === 'SIGNUP') {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert(error.message);
+      else { alert("Signup successful!"); setIsLoginModalOpen(false); }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert(error.message);
+      else setIsLoginModalOpen(false);
+    }
+  };
 
-      if (!error && data?.value) {
-        setExchangeRate(Number(data.value));
-      }
-    };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    alert("Logged out");
+  };
 
-    fetchExchangeRate();
-  }, []);
-
-  const getPrice = (krwPrice: number) =>
-    currency === 'KRW'
-      ? `₩${krwPrice.toLocaleString()}`
-      : `$${Math.round(krwPrice / (exchangeRate || 1400))}`;
+  const EXCHANGE_RATE = 1400;
+  const getPrice = (krwPrice: number) => currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / EXCHANGE_RATE)}`;
 
   const scrollSlider = (direction: number) => {
     const slider = document.getElementById('trendSlider');
-    if (slider) slider.scrollBy({ left: direction * 360, behavior: 'smooth' });
+    if (slider) slider.scrollBy({ left: direction * 350, behavior: 'smooth' });
   };
 
-  // ✅ (A) categories
-  const categories = Array.from(
-    new Set(procedures.map((p) => p.category).filter(Boolean))
-  );
-
-  // ✅ (B) filter + sort (완성형)
-  const filteredAndSorted = (() => {
-    const qq = q.trim().toLowerCase();
-
-    const base = procedures.filter((p) => {
-      const matchesQ =
-        qq === '' ||
-        p.name.toLowerCase().includes(qq) ||
-        (p.description ?? '').toLowerCase().includes(qq);
-
-      const matchesCategory = category === 'All' || p.category === category;
-      const matchesHot = !hotOnly || p.is_hot;
-      const matchesPrice = (p.price_krw ?? 0) <= (priceCapKrw || 0);
-
-      return matchesQ && matchesCategory && matchesHot && matchesPrice;
-    });
-
-    const hotFirst = (a: Procedure, b: Procedure) =>
-      a.is_hot === b.is_hot ? 0 : a.is_hot ? -1 : 1;
-
-    const rankAsc = (a: Procedure, b: Procedure) =>
-      (a.rank ?? 9999) - (b.rank ?? 9999);
-
-    const priceAsc = (a: Procedure, b: Procedure) =>
-      (a.price_krw ?? 0) - (b.price_krw ?? 0);
-
-    const priceDesc = (a: Procedure, b: Procedure) =>
-      (b.price_krw ?? 0) - (a.price_krw ?? 0);
-
-    const sorted = [...base];
-
-    if (sortMode === 'rank') {
-      // 랭크 우선 → HOT 우선 → 가격 낮은 순
-      sorted.sort((a, b) => {
-        const r = rankAsc(a, b);
-        if (r !== 0) return r;
-        const h = hotFirst(a, b);
-        if (h !== 0) return h;
-        return priceAsc(a, b);
-      });
-    } else if (sortMode === 'price_low') {
-      // 가격 낮은 순 → HOT 우선 → 랭크
-      sorted.sort((a, b) => {
-        const p = priceAsc(a, b);
-        if (p !== 0) return p;
-        const h = hotFirst(a, b);
-        if (h !== 0) return h;
-        return rankAsc(a, b);
-      });
-    } else if (sortMode === 'price_high') {
-      // 가격 높은 순 → HOT 우선 → 랭크
-      sorted.sort((a, b) => {
-        const p = priceDesc(a, b);
-        if (p !== 0) return p;
-        const h = hotFirst(a, b);
-        if (h !== 0) return h;
-        return rankAsc(a, b);
-      });
-    } else {
-      // hot: HOT 우선 → 랭크 → 가격 낮은 순
-      sorted.sort((a, b) => {
-        const h = hotFirst(a, b);
-        if (h !== 0) return h;
-        const r = rankAsc(a, b);
-        if (r !== 0) return r;
-        return priceAsc(a, b);
-      });
-    }
-
-    return sorted;
-  })();
-
-  // ✅ (C) filter/sort 변경 시 페이지 1로 리셋
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [q, category, hotOnly, priceCapKrw, sortMode]);
-
-  // ✅ (D) pagination (filteredAndSorted 기준)
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredAndSorted.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
+  const currentItems = procedures.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(procedures.length / itemsPerPage);
 
-  const handleNextPage = () => currentPage < totalPages && setCurrentPage((p) => p + 1);
-  const handlePrevPage = () => currentPage > 1 && setCurrentPage((p) => p - 1);
+  const handleNextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
+  const handlePrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
 
-  if (loading) {
-    return (
-      <div
-        className={styles.page}
-        style={{
-          height: '100vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          color: 'rgba(255,255,255,0.7)',
-        }}
-      >
-        Loading...
-      </div>
-    );
-  }
-
-  const trendingProcedures = procedures.filter((p) => p.rank <= 5);
+  if (loading) return <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>Loading...</div>;
+  const trendingProcedures = procedures.filter(p => p.rank <= 5);
 
   return (
-    <div className={styles.page}>
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={`container ${styles.navWrap}`}>
-          <div className={styles.logo}>
-            <span className={styles.logoMark}>
-              <i className="fa-solid fa-sparkles"></i>
-            </span>
-            <div className={`${styles.logoName} serif`}>
-              K-Beauty <span>Insider</span>
-            </div>
-          </div>
-
-          {/* Desktop nav */}
-          <nav className={styles.nav}>
-            <a href="#benefits">Loyalty</a>
+    <>
+      <header>
+        <div className="container nav-wrapper">
+          <div className="logo serif">K-Beauty <span style={{fontStyle:'italic', color:'#D4AF37'}}>Insider</span></div>
+          <nav className="nav-menu">
+            {user && <a href="#benefits">My Benefits</a>}
             <a href="#ranking">Trends</a>
             <a href="#prices">Prices</a>
-            <a href="#partners" className={styles.navCta}>
-              Free Pass
-            </a>
-            <a href="/admin" className={styles.iconLink} aria-label="Admin">
-              <i className="fa-solid fa-gear"></i>
-            </a>
+            <a href="#partners" style={{color:'#D4AF37', fontWeight:'bold'}}>Free Pass</a>
+            
+            {user ? (
+               <button onClick={handleLogout} style={{marginLeft:'20px', background:'none', fontWeight:'bold', cursor:'pointer', color:'#1a1a1a'}}>LOGOUT</button>
+            ) : (
+               <button onClick={() => setIsLoginModalOpen(true)} style={{marginLeft:'20px', background:'#1a1a1a', color:'white', padding:'8px 20px', borderRadius:'20px', fontSize:'0.8rem'}}>LOGIN</button>
+            )}
+            <a href="/admin" style={{marginLeft:'15px', color:'#ccc'}}><i className="fa-solid fa-gear"></i></a>
           </nav>
-
-          {/* Mobile hamburger */}
-          <button
-            className={styles.mobileNavBtn}
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMenuOpen(true)}
-          >
-            <i className="fa-solid fa-bars"></i>
-          </button>
         </div>
       </header>
 
-      {/* Mobile drawer */}
-      {menuOpen && (
-        <div
-          className={styles.drawerOverlay}
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setMenuOpen(false)}
-        >
-          <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.drawerTop}>
-              <div style={{ fontWeight: 1000 }}>Menu</div>
-              <button
-                className={styles.detailBtn}
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setMenuOpen(false)}
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-
-            <div className={styles.drawerLinks}>
-              <a className={styles.drawerLink} href="#benefits" onClick={() => setMenuOpen(false)}>
-                Loyalty <i className="fa-solid fa-chevron-right"></i>
-              </a>
-              <a className={styles.drawerLink} href="#ranking" onClick={() => setMenuOpen(false)}>
-                Trends <i className="fa-solid fa-chevron-right"></i>
-              </a>
-              <a className={styles.drawerLink} href="#prices" onClick={() => setMenuOpen(false)}>
-                Prices <i className="fa-solid fa-chevron-right"></i>
-              </a>
-              <a className={styles.drawerLink} href="#partners" onClick={() => setMenuOpen(false)}>
-                Free Pass <i className="fa-solid fa-chevron-right"></i>
-              </a>
-              <Link className={styles.drawerLink} href="/admin" onClick={() => setMenuOpen(false)}>
-                Admin <i className="fa-solid fa-gear"></i>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hero */}
-      <section className={styles.hero}>
+      <section className="hero">
         <div className="container">
-          <div className={styles.heroGrid}>
-            <div>
-              <span className={styles.kicker}>
-                <i className="fa-solid fa-shield-heart"></i>
-                Premium Medical Concierge
-              </span>
-
-              <h1 className={`${styles.h1} serif`}>
-                Discover the True Price <br />
-                of Gangnam Beauty.
-              </h1>
-
-              <p className={styles.lead}>
-                Transparent pricing from the top clinics in Korea. Compare trending procedures, see top clinics, and redeem loyalty rewards.
-              </p>
-
-              <div className={styles.heroActions}>
-                <a href="#prices" className={styles.btnPrimary}>
-                  <i className="fa-solid fa-list"></i> View Price List
-                </a>
-                <a href="#benefits" className={styles.btnGhost}>
-                  <i className="fa-solid fa-ticket"></i> Loyalty Program
-                </a>
-              </div>
-            </div>
-
-            <div className={styles.heroPanel}>
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-chart-line"></i>
-                </div>
-                <div>
-                  <p className={styles.metricTitle}>Monthly Trends</p>
-                  <p className={styles.metricText}>Top 5 procedures auto-highlighted from your Supabase ranking.</p>
-                </div>
-              </div>
-
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-hand-holding-heart"></i>
-                </div>
-                <div>
-                  <p className={styles.metricTitle}>Transparent Pricing</p>
-                  <p className={styles.metricText}>KRW / USD toggle with exchange rate from ENV or Supabase settings.</p>
-                </div>
-              </div>
-
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-stamp"></i>
-                </div>
-                <div>
-                  <p className={styles.metricTitle}>Loyalty Rewards</p>
-                  <p className={styles.metricText}>Collect stamps at partner clinics and unlock free procedures.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <span className="hero-category">Premium Medical Concierge</span>
+          <h1 className="serif">Discover the True Price <br/>of Gangnam Beauty.</h1>
+          <p>Transparent pricing from the top 1% clinics in Korea.</p>
+          <a href="#prices" className="btn-primary">View Price List</a>
         </div>
       </section>
 
-      {/* 1) Loyalty */}
-      <section id="benefits" className={`${styles.section} ${styles.sectionAlt}`}>
+      <section id="benefits" style={{background:'#FAFAF9', borderBottom:'1px solid #ddd'}}>
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <h2 className={`${styles.title} serif`}>Loyalty Program</h2>
-              <p className={styles.subtitle}>Collect 10 stamps to get a free procedure.</p>
-            </div>
-            <span className={`${styles.pill} ${styles.pillBrand}`}>
-              <i className="fa-solid fa-stamp"></i> My Stamps
-            </span>
-          </div>
-
-          <div className={styles.card}>
-            <div className={styles.cardInner}>
-              <div className={styles.loyaltyTop}>
-                <div>
-                  <div style={{ fontWeight: 1000, fontSize: 14 }}>Visit any partner clinic to earn stamps.</div>
-                  <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13, marginTop: 4 }}>Redeem after 10 visits.</div>
-                </div>
-                <div className={styles.stampCount}>
-                  {currentStamps} / {MAX_STAMPS}
-                </div>
-              </div>
-
-              <div className={styles.stampsGrid}>
-                {Array.from({ length: MAX_STAMPS }).map((_, idx) => (
-                  <div key={idx} className={`${styles.stamp} ${idx < currentStamps ? styles.stampOn : ''}`}>
-                    {idx < currentStamps ? <i className="fa-solid fa-check"></i> : idx + 1}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                {currentStamps >= MAX_STAMPS ? (
-                  <button className={styles.rewardBtn}>
-                    <i className="fa-solid fa-gift"></i> Select Free Procedure
-                  </button>
-                ) : (
-                  <div className={styles.rewardBox}>
-                    <strong style={{ color: 'rgba(255,255,255,0.90)' }}>
-                      {MAX_STAMPS - currentStamps} more visits
-                    </strong>{' '}
-                    needed for a free reward.
-                  </div>
+            <h2 className="section-title serif" style={{textAlign:'center', marginBottom:'10px'}}>Loyalty Program</h2>
+            <p className="section-subtitle" style={{textAlign:'center', marginBottom:'40px'}}>Collect 10 stamps to get a free procedure.</p>
+            
+            <div style={{background:'white', padding:'40px', borderRadius:'16px', boxShadow:'0 10px 30px rgba(0,0,0,0.05)', border:'1px solid #D4AF37', maxWidth:'800px', margin:'0 auto', position: 'relative', overflow: 'hidden'}}>
+                {!user && (
+                    <div style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', background:'rgba(255,255,255,0.8)', backdropFilter:'blur(5px)', zIndex:10, display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center'}}>
+                        <h3 className="serif" style={{marginBottom:'15px', color:'#1a1a1a'}}>Members Only Benefit</h3>
+                        <button onClick={() => setIsLoginModalOpen(true)} style={{padding:'12px 30px', background:'#D4AF37', color:'white', fontSize:'1rem', borderRadius:'30px', fontWeight:'bold', boxShadow:'0 5px 15px rgba(212, 175, 55, 0.4)'}}>Login to Check Stamps</button>
+                    </div>
                 )}
-              </div>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
+                    <div>
+                        <h3 className="serif" style={{fontSize:'1.5rem', color:'#1a1a1a', display:'flex', alignItems:'center', gap:'8px'}}>
+                            My Stamps 
+                            <span title="Collect 10 stamps to redeem!" style={{cursor:'help', fontSize:'1rem', color:'#D4AF37', opacity:0.7}}><i className="fa-solid fa-circle-question"></i></span>
+                        </h3>
+                        <p style={{color:'#888'}}>Visit any partner clinic to earn stamps.</p>
+                    </div>
+                    <div style={{fontSize:'1.2rem', fontWeight:'bold', color:'#D4AF37'}}>{currentStamps} / {MAX_STAMPS}</div>
+                </div>
+
+                <div style={{display:'flex', justifyContent:'space-between', gap:'10px', marginBottom:'30px', flexWrap:'wrap'}}>
+                    {Array.from({ length: MAX_STAMPS }).map((_, idx) => (
+                        <div key={idx} style={{width:'50px', height:'50px', borderRadius:'50%', border: idx < currentStamps ? 'none' : '2px dashed #ddd', background: idx < currentStamps ? '#D4AF37' : 'transparent', color: idx < currentStamps ? 'white' : '#ddd', display:'flex', justifyContent:'center', alignItems:'center', fontSize:'1.2rem', fontWeight:'bold'}}>
+                            {idx < currentStamps ? <i className="fa-solid fa-check"></i> : idx + 1}
+                        </div>
+                    ))}
+                </div>
+
+                <div style={{textAlign:'center'}}>
+                    {currentStamps >= MAX_STAMPS ? (
+                        <button style={{padding:'15px 40px', background:'#1a1a1a', color:'white', fontSize:'1.1rem', fontWeight:'bold', borderRadius:'30px', cursor:'pointer'}}>Select Free Procedure</button>
+                    ) : (
+                        <div style={{background:'#f5f5f5', padding:'15px', borderRadius:'8px', color:'#666', fontSize:'0.9rem'}}>{MAX_STAMPS - currentStamps} more visits needed for a free reward.</div>
+                    )}
+                </div>
             </div>
-          </div>
         </div>
       </section>
 
-      {/* 2) Trending */}
-      <section id="ranking" className={styles.section}>
+      {/* Trending Now */}
+      <section id="ranking">
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <h2 className={`${styles.title} serif`}>Trending Now</h2>
-              <p className={styles.subtitle}>Most requested procedures this month.</p>
-            </div>
-
-            <div className={styles.controlsRow}>
-              <button className={styles.detailBtn} onClick={() => scrollSlider(-1)} aria-label="Scroll left">
-                <i className="fa-solid fa-arrow-left"></i>
-              </button>
-              <button className={styles.detailBtn} onClick={() => scrollSlider(1)} aria-label="Scroll right">
-                <i className="fa-solid fa-arrow-right"></i>
-              </button>
-            </div>
+          <div className="section-header">
+             <div><h2 className="section-title serif">Trending Now</h2><p className="section-subtitle">Most requested procedures this month.</p></div>
+             <div style={{display:'flex', gap:'10px'}}>
+               <button onClick={() => scrollSlider(-1)} style={{padding:'10px', border:'1px solid #ddd', background:'white'}}><i className="fa-solid fa-arrow-left"></i></button>
+               <button onClick={() => scrollSlider(1)} style={{padding:'10px', border:'1px solid #ddd', background:'white'}}><i className="fa-solid fa-arrow-right"></i></button>
+             </div>
           </div>
-
-          <div className={styles.sliderWrap}>
-            <div className={styles.sliderTrack} id="trendSlider">
+          <div className="slider-container">
+            <div className="slider-track" id="trendSlider">
               {trendingProcedures.map((proc) => (
-                <Link href={`/procedures/${proc.id}`} key={proc.id}>
-                  <article className={styles.trendCard}>
-                    <div>
-                      <div className={styles.trendTop}>
-                        <div className={styles.rankTag}>Rank 0{proc.rank}</div>
-                        {proc.is_hot && <span className={styles.badgeHot}>HOT</span>}
+                <Link href={`/procedures/${proc.id}`} key={proc.id} style={{textDecoration:'none'}}>
+                    <article className="procedure-card" style={{minWidth:'320px', background:'white', border:'1px solid #eee', borderRadius:'12px', padding:'25px', boxShadow:'0 5px 20px rgba(0,0,0,0.05)', display:'flex', flexDirection:'column', justifyContent:'space-between', height:'100%'}}>
+                      <div>
+                          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
+                             <div style={{fontSize:'0.8rem', fontWeight:'bold', color:'#D4AF37', textTransform:'uppercase'}}>Rank 0{proc.rank}</div>
+                             {proc.is_hot && <span style={{background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'2px 8px', borderRadius:'10px', fontWeight:'bold'}}>HOT</span>}
+                          </div>
+                          <h3 style={{fontSize:'1.4rem', marginBottom:'10px', color:'#1a1a1a'}}>{proc.name}</h3>
+                          <p style={{color:'#666', fontSize:'0.9rem', lineHeight:'1.5'}}>{proc.description}</p>
                       </div>
-
-                      <h3 className={styles.trendTitle}>{proc.name}</h3>
-                      <p className={styles.trendDesc}>{proc.description}</p>
-                    </div>
-
-                    <div className={styles.trendBottom}>
-                      <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: 12 }}>Avg. Price</span>
-                      <span className={`${styles.priceStrong} serif`}>{getPrice(proc.price_krw)}</span>
-                    </div>
-                  </article>
+                      <div style={{borderTop:'1px solid #eee', paddingTop:'15px', marginTop:'20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                           <span style={{fontSize:'0.85rem', color:'#999'}}>Avg. Price</span>
+                           <span className="serif" style={{fontSize:'1.2rem', color:'#1a1a1a', fontWeight:'bold'}}>{getPrice(proc.price_krw)}</span>
+                      </div>
+                    </article>
                 </Link>
               ))}
             </div>
@@ -462,292 +224,102 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3) Prices (filter+sort+table->mobile cards) */}
-      <section id="prices" className={`${styles.section} ${styles.sectionAlt}`}>
+      {/* Price List */}
+      <section id="prices" style={{background:'#fafafa'}}>
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <h2 className={`${styles.title} serif`}>Official Price List</h2>
-              <p className={styles.subtitle}>Search/Filter/Sort + Desktop table, Mobile auto-cards. Paginated (10 per page).</p>
-            </div>
-
-            <div className={styles.controlsRow}>
-              <div className={styles.toggle} role="tablist" aria-label="Currency toggle">
-                <button
-                  className={`${styles.toggleBtn} ${currency === 'USD' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setCurrency('USD')}
-                  type="button"
-                >
-                  USD
-                </button>
-                <button
-                  className={`${styles.toggleBtn} ${currency === 'KRW' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setCurrency('KRW')}
-                  type="button"
-                >
-                  KRW
-                </button>
-              </div>
-
-              <span className={`${styles.pill} ${styles.pillCyan}`}>
-                <i className="fa-solid fa-layer-group"></i> {procedures.length} Procedures
-              </span>
-            </div>
+          <div className="section-header">
+             <h2 className="section-title serif">Official Price List</h2>
+             <div style={{display:'flex', gap:'5px'}}>
+                <button onClick={() => setCurrency('USD')} style={{fontWeight: currency==='USD'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='USD'?'2px solid black':'none'}}>USD</button>
+                <button onClick={() => setCurrency('KRW')} style={{fontWeight: currency==='KRW'?'bold':'normal', padding:'5px 10px', borderBottom: currency==='KRW'?'2px solid black':'none'}}>KRW</button>
+             </div>
           </div>
-
-          {/* ✅ Filters + Sort (NEW, 여기만 보면 됨) */}
-          <div className={styles.filters} style={{ marginBottom: 12 }}>
-            <input
-              className={styles.input}
-              placeholder="Search procedure..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-
-            <select
-              className={styles.select}
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="All">All Categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={hotOnly}
-                onChange={(e) => setHotOnly(e.target.checked)}
-              />
-              HOT only
-            </label>
-
-            <div className={styles.rangeWrap}>
-              <span className={styles.smallHint}>Up to</span>
-              <input
-                type="range"
-                min={0}
-                max={maxPriceKrw || 0}
-                step={10000}
-                value={priceCapKrw || 0}
-                onChange={(e) => setPriceCapKrw(Number(e.target.value))}
-              />
-              <span className={styles.smallHint}>₩{(priceCapKrw || 0).toLocaleString()}</span>
-            </div>
-
-            <div className={styles.sortGroup} role="tablist" aria-label="Sort prices">
-              <button
-                type="button"
-                className={`${styles.sortBtn} ${sortMode === 'rank' ? styles.sortBtnActive : ''}`}
-                onClick={() => setSortMode('rank')}
-              >
-                Rank
-              </button>
-              <button
-                type="button"
-                className={`${styles.sortBtn} ${sortMode === 'price_low' ? styles.sortBtnActive : ''}`}
-                onClick={() => setSortMode('price_low')}
-              >
-                Price ↑
-              </button>
-              <button
-                type="button"
-                className={`${styles.sortBtn} ${sortMode === 'price_high' ? styles.sortBtnActive : ''}`}
-                onClick={() => setSortMode('price_high')}
-              >
-                Price ↓
-              </button>
-              <button
-                type="button"
-                className={`${styles.sortBtn} ${sortMode === 'hot' ? styles.sortBtnActive : ''}`}
-                onClick={() => setSortMode('hot')}
-              >
-                Hot
-              </button>
-            </div>
-
-            <span className={styles.chip}>
-              <i className="fa-solid fa-filter"></i> {filteredAndSorted.length} results
-            </span>
-          </div>
-
-          <div className={styles.tableShell}>
-            {/* Desktop table */}
-            <table className={styles.table}>
-              <thead className={styles.thead}>
-                <tr>
-                  <th style={{ width: 84 }}>Rank</th>
-                  <th>Procedure</th>
-                  <th>Top Clinics</th>
-                  <th style={{ width: 160 }}>Gangnam Price</th>
-                  <th style={{ width: 120 }}>Action</th>
+          <div className="price-table-container">
+            <table>
+              <thead>
+                <tr style={{background:'#f9f9f9'}}>
+                  <th style={{width:'80px'}}>Rank</th><th>Procedure</th><th>Top Clinics</th><th>Gangnam Price</th><th>Action</th>
                 </tr>
               </thead>
-
               <tbody>
                 {currentItems.map((proc) => {
                   const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
                   const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
-
                   return (
-                    <tr key={proc.id} className={styles.trow}>
-                      <td style={{ fontWeight: 1000, color: 'rgba(255,255,255,0.55)' }}>{proc.rank}</td>
+                    <tr key={proc.id}>
+                      <td style={{fontWeight:'bold', color:'#ccc', fontSize:'1.2rem'}}>{proc.rank}</td>
+                      <td><strong style={{fontSize:'1.1rem'}}>{proc.name}</strong><div style={{fontSize:'0.8rem', color:'#999'}}>{proc.category}</div></td>
                       <td>
-                        <div className={styles.procName}>{proc.name}</div>
-                        <div className={styles.procMeta}>{proc.category}</div>
+                          {displayedClinics.length > 0 ? (
+                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                                {displayedClinics.map((c, i) => (<div key={i} style={{fontSize:'0.9rem', color:'#555', display:'flex', alignItems:'center'}}><i className="fa-solid fa-hospital" style={{fontSize:'0.7rem', color:'#D4AF37', marginRight:'6px'}}></i>{c.split(':')[0]}</div>))}
+                                {extraCount > 0 && <div style={{fontSize:'0.75rem', color:'#aaa', marginLeft:'15px'}}>+ {extraCount} more</div>}
+                            </div>
+                          ) : (<span style={{color:'#ddd', fontSize:'0.9rem'}}>-</span>)}
                       </td>
-                      <td>
-                        {displayedClinics.length > 0 ? (
-                          <div className={styles.clinicList}>
-                            {displayedClinics.map((c, i) => (
-                              <div key={i} className={styles.clinicItem}>
-                                <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }}></i>
-                                {c.split(':')[0]}
-                              </div>
-                            ))}
-                            {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
-                          </div>
-                        ) : (
-                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>-</span>
-                        )}
-                      </td>
-                      <td className={`${styles.priceStrong} serif`}>{getPrice(proc.price_krw)}</td>
-                      <td>
-                        <Link href={`/procedures/${proc.id}`}>
-                          <button className={styles.detailBtn} type="button">
-                            DETAILS
-                          </button>
-                        </Link>
-                      </td>
+                      <td className="price-tag" style={{color:'#D4AF37'}}>{getPrice(proc.price_krw)}</td>
+                      <td><Link href={`/procedures/${proc.id}`}><button style={{border:'1px solid #ddd', background:'white', padding:'8px 15px', borderRadius:'20px', fontWeight:'bold', fontSize:'0.8rem'}}>DETAILS</button></Link></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-
-            {/* Mobile cards (auto via CSS) */}
-            <div className={styles.mobileCards}>
-              {currentItems.map((proc) => {
-                const displayedClinics = proc.clinics ? proc.clinics.slice(0, 2) : [];
-                const extraCount = proc.clinics ? proc.clinics.length - 2 : 0;
-
-                return (
-                  <div key={proc.id} className={styles.priceCard}>
-                    <div className={styles.priceCardTop}>
-                      <div>
-                        <h3 className={styles.priceCardTitle}>
-                          #{proc.rank} · {proc.name}{' '}
-                          {proc.is_hot && <span className={styles.badgeHot} style={{ marginLeft: 8 }}>HOT</span>}
-                        </h3>
-                        <div className={styles.priceCardMeta}>{proc.category}</div>
-                      </div>
-                      <div className={`${styles.priceCardPrice} serif`}>{getPrice(proc.price_krw)}</div>
-                    </div>
-
-                    <div className={styles.priceCardClinics}>
-                      {displayedClinics.length > 0 ? (
-                        <>
-                          {displayedClinics.map((c, i) => (
-                            <div key={i} className={styles.clinicItem}>
-                              <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }}></i>
-                              {c.split(':')[0]}
-                            </div>
-                          ))}
-                          {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
-                        </>
-                      ) : (
-                        <div style={{ color: 'rgba(255,255,255,0.35)' }}>No clinic list</div>
-                      )}
-                    </div>
-
-                    <div className={styles.priceCardActions}>
-                      <Link href={`/procedures/${proc.id}`}>
-                        <button className={styles.detailBtn} type="button">DETAILS</button>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                onClick={handlePrevPage}
-                disabled={currentPage === 1}
-                type="button"
-              >
-                <i className="fa-solid fa-chevron-left"></i> Prev
-              </button>
-
-              <div className={styles.pageInfo}>
-                Page {currentPage} of {totalPages || 1}
-              </div>
-
-              <button
-                className={styles.pageBtn}
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages || totalPages === 0}
-                type="button"
-              >
-                Next <i className="fa-solid fa-chevron-right"></i>
-              </button>
+            <div style={{padding:'20px', display:'flex', justifyContent:'center', alignItems:'center', gap:'20px', borderTop:'1px solid #eee'}}>
+                <button onClick={handlePrevPage} disabled={currentPage === 1} style={{padding:'10px 15px', background: currentPage === 1 ? '#f5f5f5' : 'white', border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', color: currentPage === 1 ? '#ccc' : '#333'}}><i className="fa-solid fa-chevron-left"></i> Prev</button>
+                <span style={{fontFamily:'Playfair Display', fontWeight:'bold', color:'#1a1a1a'}}>Page {currentPage} of {totalPages}</span>
+                <button onClick={handleNextPage} disabled={currentPage === totalPages} style={{padding:'10px 15px', background: currentPage === totalPages ? '#f5f5f5' : 'white', border:'1px solid #ddd', borderRadius:'8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', color: currentPage === totalPages ? '#ccc' : '#333'}}>Next <i className="fa-solid fa-chevron-right"></i></button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4) Partners */}
-      <section id="partners" className={styles.section}>
+      {/* Free Pass Clinics */}
+      <section id="partners">
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <h2 className={`${styles.title} serif`} style={{ color: 'var(--brand)' }}>
-                Free Pass Clinics
-              </h2>
-              <p className={styles.subtitle}>Exclusive Benefit: redeem your free procedure at these partner clinics.</p>
-            </div>
-            <span className={`${styles.pill} ${styles.pillBrand}`}>
-              <i className="fa-solid fa-ticket"></i> FREE PASS
-            </span>
-          </div>
-
-          <div className={styles.partnerGrid}>
-            {PARTNERS.map((partner, idx) => (
-              <div key={idx} className={styles.partnerCard}>
-                <div className={`${styles.pill} ${styles.pillBrand} ${styles.partnerTag}`}>FREE PASS</div>
-
-                <div className={styles.partnerIcon}>
-                  <i className="fa-solid fa-hospital"></i>
+          <div style={{textAlign:'center', marginBottom:'40px'}}><h2 className="section-title serif" style={{color:'#D4AF37'}}>Free Pass Clinics</h2><p className="section-subtitle"><strong>Exclusive Benefit:</strong> You can redeem your free procedure at these partner clinics.</p></div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', gap:'20px'}}>
+             {PARTNERS.map((partner, idx) => (
+                <div key={idx} style={{background:'white', border:'1px solid #eee', padding:'30px', borderRadius:'12px', textAlign:'center', transition:'all 0.3s', boxShadow:'0 5px 15px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden'}} className="hover-card">
+                   <div style={{position:'absolute', top:'15px', right:'15px', background:'#D4AF37', color:'white', fontSize:'0.7rem', padding:'3px 8px', borderRadius:'4px', fontWeight:'bold'}}>FREE PASS</div>
+                   <div style={{width:'60px', height:'60px', background:'#f9f9f9', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 20px', color:'#D4AF37'}}><i className="fa-solid fa-hospital fa-2x"></i></div>
+                   <h3 style={{fontSize:'1.1rem', fontWeight:'bold', marginBottom:'5px'}}>{partner.name}</h3>
+                   <div style={{fontSize:'0.85rem', color:'#888', marginBottom:'15px'}}>{partner.category}</div>
+                   <div style={{fontSize:'0.8rem', color:'#aaa', borderTop:'1px solid #eee', paddingTop:'15px'}}><i className="fa-solid fa-location-dot" style={{marginRight:'5px'}}></i> {partner.location}</div>
                 </div>
-
-                <h3 className={styles.partnerName}>{partner.name}</h3>
-                <p className={styles.partnerMeta}>{partner.category}</p>
-
-                <div className={styles.partnerLoc}>
-                  <i className="fa-solid fa-location-dot" style={{ marginRight: 6 }}></i>
-                  {partner.location}
-                </div>
-              </div>
-            ))}
+             ))}
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
+      
+      <footer style={{background:'#1a1a1a', color:'white', padding:'60px 0', textAlign:'center'}}>
         <div className="container">
-          <div className={`${styles.footerBrand} serif`}>
-            K-Beauty <span style={{ fontStyle: 'italic', color: 'var(--brand)' }}>Insider</span>
-          </div>
-          <div style={{ fontSize: 13 }}>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</div>
+            <div className="serif" style={{fontSize:'1.5rem', marginBottom:'20px'}}>K-Beauty <span style={{fontStyle:'italic', color:'#D4AF37'}}>Insider</span></div>
+            <p style={{color:'#555', fontSize:'0.9rem'}}>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</p>
         </div>
       </footer>
-    </div>
+
+      {/* Login Modal */}
+      {isLoginModalOpen && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center'}}>
+            <div style={{background:'white', padding:'40px', borderRadius:'16px', width:'400px', boxShadow:'0 20px 50px rgba(0,0,0,0.3)', position:'relative'}}>
+                <button onClick={()=>setIsLoginModalOpen(false)} style={{position:'absolute', top:'15px', right:'20px', background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer'}}>✕</button>
+                <h2 className="serif" style={{textAlign:'center', marginBottom:'20px', color:'#1a1a1a'}}>{authMode === 'LOGIN' ? 'Welcome Back' : 'Join Membership'}</h2>
+                <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                    <input type="email" placeholder="Email Address" value={email} onChange={(e)=>setEmail(e.target.value)} style={{padding:'15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'1rem'}} />
+                    <input type="password" placeholder="Password" value={password} onChange={(e)=>setPassword(e.target.value)} style={{padding:'15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'1rem'}} />
+                    <button onClick={handleAuth} style={{padding:'15px', background:'#D4AF37', color:'white', border:'none', borderRadius:'8px', fontWeight:'bold', fontSize:'1rem', marginTop:'10px', cursor:'pointer'}}>
+                        {authMode === 'LOGIN' ? 'LOGIN' : 'SIGN UP'}
+                    </button>
+                </div>
+                <div style={{textAlign:'center', marginTop:'20px', fontSize:'0.9rem'}}>
+                    {authMode === 'LOGIN' ? "Don't have an account? " : "Already have an account? "}
+                    <button onClick={() => setAuthMode(authMode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')} style={{background:'none', border:'none', color:'#1a1a1a', fontWeight:'bold', textDecoration:'underline', cursor:'pointer'}}>
+                        {authMode === 'LOGIN' ? 'Sign Up' : 'Login'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+    </>
   );
 }
