@@ -1,229 +1,382 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
 export default function AdminPage() {
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
+  // Auth gates
+  const [isAdmin, setIsAdmin] = useState(false);
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Data
   const [procedures, setProcedures] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
   const [stamps, setStamps] = useState<any[]>([]);
 
+  const canAccess = useMemo(() => isAdmin || isAuthenticated, [isAdmin, isAuthenticated]);
+
+  // 1) Admin role check (Supabase 로그인 기반)
   useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (profile?.role === 'admin') {
-          setIsAdmin(true);
-          fetchAllData(); 
+    const run = async () => {
+      try {
+        const { data: userRes, error: userErr } = await supabase.auth.getUser();
+        const user = userRes?.user;
+
+        if (userErr) {
+          // 로그인 세션이 없거나 오류면 admin false 유지
+          setIsAdmin(false);
+          return;
         }
+
+        if (!user) {
+          setIsAdmin(false);
+          return;
+        }
+
+        // profiles row가 없거나 RLS로 막혀도 죽지 않게 처리
+        const { data: profile, error: profErr } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!profErr && profile?.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    checkAdmin();
+
+    run();
   }, []);
 
+  // 2) 권한이 확보되면 데이터 로드 (한 번만)
   useEffect(() => {
-    if (isAuthenticated) fetchAllData();
-  }, [isAuthenticated]);
+    if (!canAccess) return;
 
-  const fetchAllData = async () => {
-    const { data: procData } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
-    if (procData) setProcedures(procData);
+    const fetchAllData = async () => {
+      const [{ data: procData }, { data: resData }, { data: stampData }] = await Promise.all([
+        supabase.from('procedures').select('*').order('rank', { ascending: true }),
+        supabase.from('reservations').select('*').order('created_at', { ascending: false }),
+        supabase.from('stamps').select('*'),
+      ]);
 
-    const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false });
-    if (resData) setReservations(resData);
+      if (procData) setProcedures(procData);
+      if (resData) setReservations(resData);
+      if (stampData) setStamps(stampData);
+    };
 
-    const { data: stampData } = await supabase.from('stamps').select('*');
-    if (stampData) setStamps(stampData);
-  };
+    fetchAllData();
+  }, [canAccess]);
 
   const handleLogin = () => {
+    // TODO: 하드코딩 대신 ENV 권장. 일단 현재 패턴 유지.
     if (password === '1234') setIsAuthenticated(true);
     else alert('Wrong Password!');
   };
 
   const handleUpdate = async (id: number, field: string, value: any) => {
-    setProcedures(procedures.map(item => item.id === id ? { ...item, [field]: value } : item));
+    setProcedures((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
     await supabase.from('procedures').update({ [field]: value }).eq('id', id);
   };
+
   const handleClinicUpdate = async (id: number, text: string) => {
-    const clinicArray = text.split(',').map(c => c.trim());
-    handleUpdate(id, 'clinics', clinicArray);
+    const clinicArray = text.split(',').map((c) => c.trim()).filter(Boolean);
+    await handleUpdate(id, 'clinics', clinicArray);
   };
+
   const handleDeleteProcedure = async (id: number) => {
-    if (!confirm("정말 삭제하시겠습니까?")) return;
-    setProcedures(procedures.filter(p => p.id !== id));
+    if (!confirm('Delete this procedure?')) return;
+    setProcedures((prev) => prev.filter((p) => p.id !== id));
     await supabase.from('procedures').delete().eq('id', id);
   };
 
   const handleStatusChange = async (id: number, newStatus: string) => {
-    setReservations(reservations.map(res => res.id === id ? { ...res, status: newStatus } : res));
+    setReservations((prev) => prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res)));
     await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
   };
 
   const handleDeleteReservation = async (id: number) => {
-    if (!confirm("정말 삭제하시겠습니까?")) return;
-    setReservations(reservations.filter(r => r.id !== id));
+    if (!confirm('Delete this reservation?')) return;
+    setReservations((prev) => prev.filter((r) => r.id !== id));
     await supabase.from('reservations').delete().eq('id', id);
   };
 
-  // ★ 스탬프 발급 함수
   const handleIssueStamp = async (reservation: any) => {
-    if (!confirm(`'${reservation.customer_name}' 고객님께 스탬프를 발급하시겠습니까?`)) return;
-    if (!reservation.user_id) {
-        alert("회원 연동이 안 된 예약입니다. (비회원 예약)");
-        return;
-    }
-    const { data: { user } } = await supabase.auth.getUser();
+    if (!confirm(`Issue stamp for ${reservation.customer_name}?`)) return;
 
-    const { data, error } = await supabase.from('stamps').insert({
+    if (!reservation.user_id) {
+      alert('Cannot issue stamp: Guest user (No ID linked).');
+      return;
+    }
+
+    const { data: userRes } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('stamps')
+      .insert({
         user_id: reservation.user_id,
         reservation_id: reservation.id,
-        issued_by: user?.id
-    }).select();
+        issued_by: userRes?.user?.id ?? null,
+      })
+      .select();
 
     if (error) {
-        alert("발급 실패! (이미 발급되었거나 오류 발생)");
-        console.error(error);
-    } else {
-        alert("스탬프가 발급되었습니다! 🎟️");
-        if (data) setStamps([...stamps, data[0]]);
+      alert('Failed to issue stamp.');
+      console.error(error);
+      return;
     }
-  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Pending': return { bg: '#fff3e0', text: '#e65100' };
-      case 'Confirmed': return { bg: '#e8f5e9', text: '#2e7d32' };
-      case 'Completed': return { bg: '#e3f2fd', text: '#1565c0' };
-      case 'Cancelled': return { bg: '#f5f5f5', text: '#757575' };
-      default: return { bg: '#eee', text: '#333' };
-    }
+    if (data?.[0]) setStamps((prev) => [...prev, data[0]]);
+    alert('Stamp Issued!');
   };
 
   const handleFileUpload = (e: any) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async (evt: any) => {
       const bstr = evt.target.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(ws);
-      if (confirm(`${data.length}개 업로드 하시겠습니까?`)) {
-        const formattedData = data.map((row: any) => ({
-            name: row.name, rank: row.rank || 99, price_krw: row.price_krw,
-            category: row.category || 'Etc', description: row.description || '',
-            clinics: row.clinics ? row.clinics.split(',').map((c:string) => c.trim()) : [],
-            is_hot: row.is_hot === 'TRUE' || row.is_hot === true
-        }));
-        const { error } = await supabase.from('procedures').insert(formattedData);
-        if (!error) window.location.reload();
+
+      if (!confirm(`Upload ${data.length} items?`)) return;
+
+      const formattedData = (data as any[]).map((row: any) => ({
+        name: row.name,
+        rank: row.rank || 99,
+        price_krw: row.price_krw,
+        category: row.category || 'Etc',
+        description: row.description || '',
+        clinics: row.clinics ? String(row.clinics).split(',').map((c: string) => c.trim()) : [],
+        is_hot: row.is_hot === 'TRUE' || row.is_hot === true,
+      }));
+
+      const { error } = await supabase.from('procedures').insert(formattedData);
+      if (error) {
+        alert('Upload failed');
+        console.error(error);
+        return;
       }
+
+      // reload 대신 다시 fetch 권장하지만, 일단 기존 유지
+      window.location.reload();
     };
+
     reader.readAsBinaryString(file);
   };
 
-  if (!isAuthenticated && !isAdmin) {
+  // ✅ 로딩 화면
+  if (loading) {
     return (
-        <div style={{height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', background:'#f0f2f5'}}>
-            <div style={{padding:'40px', background:'white', border:'1px solid #ddd', borderRadius:'10px', textAlign:'center', boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
-                <h2 style={{marginBottom:'20px', color:'#102A43'}}>Admin Login</h2>
-                <input type="password" onChange={(e)=>setPassword(e.target.value)} style={{display:'block', margin:'10px auto', padding:'12px', width:'250px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Password" />
-                <button onClick={handleLogin} style={{padding:'12px 20px', width:'250px', background:'#102A43', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Login</button>
-            </div>
+      <div className="page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // ✅ 권한 없으면 로그인 폼
+  if (!canAccess) {
+    return (
+      <div className="page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+        <div className="card" style={{ width: 360, padding: 40, textAlign: 'center' }}>
+          <h2 className="title" style={{ marginBottom: 20 }}>
+            Admin Access
+          </h2>
+          <input
+            type="password"
+            onChange={(e) => setPassword(e.target.value)}
+            className="input"
+            style={{ width: '100%', marginBottom: 15 }}
+            placeholder="Enter Password"
+          />
+          <button onClick={handleLogin} className="btnPrimary" style={{ width: '100%' }}>
+            Login
+          </button>
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+            (Supabase admin role 로그인 시 자동 통과)
+          </div>
         </div>
+      </div>
     );
   }
 
   return (
-    <div style={{padding:'40px 5%', width:'100%', minHeight:'100vh', background:'#f8f9fa'}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
+    <div className="page" style={{ padding: '40px 5%' }}>
+      {/* Header */}
+      <div className="sectionHeader">
         <div>
-            <h1 style={{color:'#102A43', marginBottom:'5px'}}>🔧 Admin Dashboard</h1>
-            <p style={{color:'#666', fontSize:'0.9rem'}}>Real-time Database Management</p>
+          <h1 className="title">Admin Dashboard</h1>
+          <p className="subtitle">Manage procedures, reservations, and stamps.</p>
         </div>
-        <div style={{display:'flex', gap:'10px'}}>
-             <label style={{background:'#2e7d32', color:'white', padding:'10px 20px', borderRadius:'30px', fontWeight:'bold', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}}>
-                <i className="fa-solid fa-file-excel"></i> Excel Upload
-                <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{display:'none'}} />
-             </label>
-            <Link href="/" style={{textDecoration:'none', background:'white', padding:'10px 20px', borderRadius:'30px', border:'1px solid #ddd', fontWeight:'bold', color:'#102A43', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                View Site <i className="fa-solid fa-arrow-up-right-from-square" style={{marginLeft:'5px'}}></i>
-            </Link>
+        <div className="controlsRow">
+          <label className="btnPrimary" style={{ background: 'var(--brand-2)', color: 'black', cursor: 'pointer' }}>
+            <i className="fa-solid fa-file-excel" style={{ marginRight: 8 }} /> Upload Excel
+            <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ display: 'none' }} />
+          </label>
+          <Link href="/" className="btnGhost">
+            View Site <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 5 }} />
+          </Link>
         </div>
       </div>
 
-      <section style={{marginBottom:'40px', background:'white', padding:'30px', borderRadius:'16px', boxShadow:'0 2px 10px rgba(0,0,0,0.03)'}}>
-        <h2 style={{borderBottom:'2px solid #00B4D8', display:'inline-block', marginBottom:'20px', color:'#102A43'}}>📋 Reservation & Stamps</h2>
-        <div style={{width:'100%', overflowX:'auto'}}>
-            <table style={{width:'100%', borderCollapse:'collapse', minWidth:'800px'}}>
-                <thead>
-                    <tr style={{background:'#F0F4F8', color:'#486581'}}>
-                        <th style={{padding:'15px', textAlign:'left'}}>Date</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Customer</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Target Procedure</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Status</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Stamp Action</th>
-                        <th style={{padding:'15px', textAlign:'left'}}>Delete</th>
+      {/* Reservations & Stamps */}
+      <section className="sectionAlt" style={{ borderRadius: 20, padding: 30, marginBottom: 40, border: '1px solid var(--border)' }}>
+        <h2 className="title" style={{ fontSize: 20, marginBottom: 20 }}>
+          📋 Reservations & Stamps
+        </h2>
+
+        <div className="tableShell">
+          <div className="price-table-wrapper">
+            <table className="table">
+              <thead className="thead">
+                <tr>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Procedure</th>
+                  <th>Status</th>
+                  <th className="thAction">Stamp</th>
+                  <th className="thAction">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservations.map((res) => {
+                  const isStamped = stamps.some((s) => s.reservation_id === res.id);
+                  return (
+                    <tr key={res.id} className="trow">
+                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                        {new Date(res.created_at).toLocaleDateString()}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 'bold' }}>{res.customer_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{res.contact_info}</div>
+                      </td>
+                      <td style={{ color: 'var(--brand)', fontWeight: 600 }}>{res.procedure_name}</td>
+
+                      <td>
+                        <select
+                          value={res.status}
+                          onChange={(e) => handleStatusChange(res.id, e.target.value)}
+                          className="select"
+                          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}
+                        >
+                          <option value="Pending">🟠 Pending</option>
+                          <option value="Confirmed">🟢 Confirmed</option>
+                          <option value="Completed">🔵 Completed</option>
+                          <option value="Cancelled">⚪ Cancelled</option>
+                        </select>
+                      </td>
+
+                      <td className="tdAction">
+                        {isStamped ? (
+                          <span style={{ color: 'var(--brand)', fontWeight: 'bold', fontSize: 12, border: '1px solid var(--brand)', padding: '4px 8px', borderRadius: 99 }}>
+                            ✓ Issued
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleIssueStamp(res)}
+                            disabled={res.status !== 'Completed'}
+                            style={{
+                              opacity: res.status === 'Completed' ? 1 : 0.3,
+                              cursor: res.status === 'Completed' ? 'pointer' : 'not-allowed',
+                              background: 'var(--brand)',
+                              color: 'black',
+                              padding: '6px 12px',
+                              borderRadius: 99,
+                              fontSize: 11,
+                              fontWeight: 800,
+                            }}
+                          >
+                            ISSUE STAMP
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="tdAction">
+                        <button onClick={() => handleDeleteReservation(res.id)} style={{ color: 'var(--text-muted)' }}>
+                          <i className="fa-solid fa-trash" />
+                        </button>
+                      </td>
                     </tr>
-                </thead>
-                <tbody>
-                    {reservations.map((res) => {
-                        const colors = getStatusColor(res.status);
-                        const isStamped = stamps.some(s => s.reservation_id === res.id);
-                        return (
-                            <tr key={res.id} style={{borderBottom:'1px solid #f1f3f5'}}>
-                                <td style={{padding:'15px', fontSize:'0.9rem', color:'#666'}}>{new Date(res.created_at).toLocaleDateString()}</td>
-                                <td style={{padding:'15px', fontWeight:'bold', fontSize:'1rem'}}>
-                                    {res.customer_name}
-                                    <div style={{fontSize:'0.8rem', fontWeight:'normal', color:'#888'}}>{res.contact_info}</div>
-                                </td>
-                                <td style={{padding:'15px', color:'#00B4D8', fontWeight:'600'}}>{res.procedure_name}</td>
-                                <td style={{padding:'15px'}}>
-                                    <select
-                                        value={res.status}
-                                        onChange={(e) => handleStatusChange(res.id, e.target.value)}
-                                        style={{padding: '8px 12px', borderRadius: '20px', border: 'none', background: colors.bg, color: colors.text, fontWeight: 'bold', cursor: 'pointer', outline: 'none'}}
-                                    >
-                                        <option value="Pending">🟠 Pending</option>
-                                        <option value="Confirmed">🟢 Confirmed</option>
-                                        <option value="Completed">🔵 Completed (Visit)</option>
-                                        <option value="Cancelled">⚪ Cancelled</option>
-                                    </select>
-                                </td>
-                                <td style={{padding:'15px'}}>
-                                    {isStamped ? (
-                                        <span style={{background:'#2e7d32', color:'white', padding:'6px 12px', borderRadius:'20px', fontSize:'0.85rem', fontWeight:'bold'}}>
-                                            <i className="fa-solid fa-check"></i> Issued
-                                        </span>
-                                    ) : (
-                                        <button onClick={() => handleIssueStamp(res)} disabled={res.status !== 'Completed'} style={{background: res.status === 'Completed' ? '#D4AF37' : '#eee', color: res.status === 'Completed' ? 'white' : '#aaa', border: 'none', padding:'8px 15px', borderRadius:'20px', cursor: res.status === 'Completed' ? 'pointer' : 'not-allowed', fontWeight:'bold', fontSize:'0.85rem'}}>
-                                            Issue Stamp
-                                        </button>
-                                    )}
-                                </td>
-                                <td style={{padding:'15px'}}>
-                                    <button onClick={() => handleDeleteReservation(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.1rem'}}><i className="fa-solid fa-trash-can"></i></button>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
+                  );
+                })}
+              </tbody>
             </table>
+          </div>
         </div>
       </section>
-      
-      {/* (시술 관리 섹션은 코드량 때문에 생략되었으나 기존 유지) */}
+
+      {/* Procedures */}
+      <section className="sectionAlt" style={{ borderRadius: 20, padding: 30, border: '1px solid var(--border)' }}>
+        <h2 className="title" style={{ fontSize: 20, marginBottom: 20 }}>
+          💰 Procedures & Prices
+        </h2>
+
+        <div className="tableShell">
+          <div className="price-table-wrapper">
+            <table className="table">
+              <thead className="thead">
+                <tr>
+                  <th style={{ width: 60 }}>Rank</th>
+                  <th>Name</th>
+                  <th>Price (KRW)</th>
+                  <th>Clinics (Name:Price)</th>
+                  <th className="thAction">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {procedures.map((item) => (
+                  <tr key={item.id} className="trow">
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={item.rank}
+                        onBlur={(e) => handleUpdate(item.id, 'rank', Number(e.target.value))}
+                        className="input"
+                        style={{ width: 50, padding: 6, textAlign: 'center', height: 30 }}
+                      />
+                    </td>
+                    <td style={{ fontWeight: 'bold' }}>{item.name}</td>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={item.price_krw}
+                        onBlur={(e) => handleUpdate(item.id, 'price_krw', Number(e.target.value))}
+                        className="input"
+                        style={{ width: 120, padding: 6, height: 30 }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        defaultValue={item.clinics?.join(', ') ?? ''}
+                        onBlur={(e) => handleClinicUpdate(item.id, e.target.value)}
+                        className="input"
+                        style={{ width: '100%', padding: 6, fontSize: 12, height: 30 }}
+                      />
+                    </td>
+                    <td className="tdAction">
+                      <button onClick={() => handleDeleteProcedure(item.id)} style={{ color: 'var(--danger)' }}>
+                        <i className="fa-solid fa-trash" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
