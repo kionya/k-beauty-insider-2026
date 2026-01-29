@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { requireAdmin } from '../_supabase';
+import { __DEBUG_REQUIRE_ADMIN_EXISTS__ } from '../_supabase';
 
 export async function GET(req: NextRequest) {
   const gate = await requireAdmin(req);
