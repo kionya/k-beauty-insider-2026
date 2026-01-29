@@ -8,15 +8,6 @@ const inter = Inter({
   variable: '--font-sans',
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className={inter.variable}>
-      <body>{children}</body>
-    </html>
-  );
-}
-
-
 // 1. SEO & Open Graph 설정 (마케팅 문구 적용)
 export const metadata: Metadata = {
   // 브라우저 탭 이름
@@ -59,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <head>
         {/* Fonts */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
