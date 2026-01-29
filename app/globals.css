@@ -121,10 +121,17 @@ button {
   .container { width: calc(100% - 28px); }
 }
 
-/* 모바일에서 표 가로 스크롤 허용 */
+/* 모바일에서 표 가로 스크롤 허용 (기존 유지) */
 .price-table-wrapper {
-  overflow-x: auto !important; /* 가로 스크롤 켜기 */
-  -webkit-overflow-scrolling: touch; /* 아이폰에서 부드럽게 */
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+.price-table-container { /* React 코드에서 사용하는 클래스 매핑 */
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  background: var(--card); /* 배경색 맞춤 */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 /* 기본 outline 제거 대신 :focus-visible로만 링 표시 */
@@ -135,13 +142,151 @@ button {
   border-color: rgba(125,211,252,0.55) !important;
 }
 
-/* 클릭/터치(마우스)에는 링 안 뜨고, 키보드 탭에만 뜸 */
 @media (prefers-reduced-motion: no-preference){
   :where(button, a, input, select, textarea){
     transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
   }
 }
-/* Force all headings to Inter/sans */
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-sans) !important;
+}
+
+/* ------------------------------------------------------------ */
+/* ▼ [NEW] 기능 구현을 위해 추가된 필수 스타일 (다크테마 최적화) ▼ */
+/* ------------------------------------------------------------ */
+
+/* 1. 로그인/예약 모달 (다크 글래스모피즘) */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex; justify-content: center; align-items: center;
+}
+
+.modal-content {
+  background: #11151a; /* 아주 진한 배경 */
+  border: 1px solid var(--border-2);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  width: 400px;
+  max-width: 90%;
+  position: relative;
+  color: var(--text);
+}
+
+/* 모달 내부 인풋 다크 스타일 */
+.input-dark, select {
+  width: 100%;
+  padding: 14px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+.input-dark:focus, select:focus {
+  border-color: var(--brand);
+}
+
+/* 2. 스탬프 (로얄티 프로그램) */
+.stamp-card-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 40px;
+  position: relative;
+  overflow: hidden; /* 블러 효과를 위해 필수 */
+}
+
+/* 비회원일 때 덮는 블러 (다크 버전) */
+.blur-overlay-dark {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(11, 15, 20, 0.6); /* 배경색과 맞춤 */
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  display: flex; flex-direction: column; 
+  justify-content: center; align-items: center;
+}
+
+.stamp-circle {
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  display: flex; justify-content: center; align-items: center;
+  font-weight: 800; font-size: 1.2rem;
+}
+
+.stamp-active {
+  background: var(--brand);
+  color: #000;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+}
+
+.stamp-inactive {
+  background: rgba(255,255,255,0.03);
+  border: 2px dashed var(--border-2);
+  color: var(--text-faint);
+}
+
+/* 3. 페이지네이션 버튼 */
+.pagination-btn {
+  padding: 10px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+.pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 4. 테이블 스타일 (다크 모드용 오버라이드) */
+table th {
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  text-align: left;
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+table td {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 16px;
+  color: var(--text);
+}
+table tr:hover {
+  background: var(--panel);
+}
+
+/* 5. 뱃지 스타일 */
+.badge-hot {
+  background: var(--brand);
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.badge-free {
+  background: var(--brand-2); /* Cyan */
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11px;
+  position: absolute; top: 15px; right: 15px;
 }
