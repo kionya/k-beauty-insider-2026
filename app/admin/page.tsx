@@ -64,7 +64,7 @@ export default function AdminPage() {
         // ✅ [여기 추가] 세션 확인 로그
         const { data: sess } = await supabase.auth.getSession();
         console.log('ADMIN session?', sess.session);
-        
+
         const { data: userRes, error: userErr } = await supabase.auth.getUser();
         const user = userRes?.user;
 
@@ -198,7 +198,9 @@ export default function AdminPage() {
         price_krw: row.price_krw,
         category: row.category || 'Etc',
         description: row.description || '',
-        clinics: row.clinics ? String(row.clinics).split(',').map((c: string) => c.trim()) : [],
+        clinics: row.clinics
+          ? String(row.clinics).split(',').map((c: string) => c.trim()).filter(Boolean)
+          : [],
         is_hot: row.is_hot === 'TRUE' || row.is_hot === true,
       }));
 
@@ -207,7 +209,7 @@ export default function AdminPage() {
         body: JSON.stringify({ items: formattedData }),
       });
 
-      await fetchAllData();
+      await fetchAllData(); // ✅ 업로드 후 화면만 갱신
       alert('Upload success');
     } catch (e: any) {
       alert(e?.message ?? 'Upload failed');
@@ -215,9 +217,10 @@ export default function AdminPage() {
     }
   };
 
-  // ✅ 이 줄은 onload 바깥에 있어야 함 (필수)
+  // ✅ 이 줄은 반드시 handleFileUpload 함수의 맨 아래(= onload 바깥)에 있어야 합니다.
   reader.readAsBinaryString(file);
 };
+
 
   // ✅ 로딩 화면
   if (loading) {
