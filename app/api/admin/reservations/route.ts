@@ -1,12 +1,13 @@
+// app/api/admin/reservations/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requireAdmin } from '../_supabase';
+import { requireAdmin, supabaseAdmin } from '../_supabase';
 
 export async function GET(req: NextRequest) {
   const gate = await requireAdmin(req);
-  if (!gate.ok) return NextResponse.json({ error: 'forbidden' }, { status: gate.status });
+  if (!gate.ok) return gate.res;
 
-  const { data, error } = await gate.supabase
+  const { data, error } = await supabaseAdmin
     .from('reservations')
     .select('*')
     .order('created_at', { ascending: false });

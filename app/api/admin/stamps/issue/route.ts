@@ -1,37 +1,41 @@
+// app/api/admin/stamps/issue/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requireAdmin } from '../../_supabase';
+import { requireAdmin, supabaseAdmin } from '../../_supabase';
 
 export async function POST(req: NextRequest) {
   const gate = await requireAdmin(req);
-  if (!gate.ok) return NextResponse.json({ error: 'forbidden' }, { status: gate.status });
+  if (!gate.ok) return gate.res;
 
   const body = await req.json().catch(() => ({}));
   const reservation_id = Number(body?.reservation_id);
 
   if (!Number.isFinite(reservation_id)) {
-    return NextResponse.json({ error: 'reservation_id required' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid reservation_id' }, { status: 400 });
   }
 
-  // 예약 조회해서 guest 여부 확인(UX용) — 최종 강제는 DB 트리거가 함
-  const { data: resv, error: resErr } = await gate.supabase
+  // 예약 상태/유저 체크
+  const { data: resv, error: resvErr } = await supabaseAdmin
     .from('reservations')
-    .select('id, user_id, status')
+    .select('id,user_id,status')
     .eq('id', reservation_id)
-    .single();
+    .maybeSingle();
 
-  if (resErr || !resv) return NextResponse.json({ error: 'reservation not found' }, { status: 404 });
-  if (!resv.user_id) return NextResponse.json({ error: 'guest reservation (no user_id)' }, { status: 400 });
+  if (resvErr) return NextResponse.json({ error: resvErr.message }, { status: 500 });
+  if (!resv) return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
+  if (!resv.user_id) return NextResponse.json({ error: 'Guest reservation: no user_id' }, { status: 400 });
+  if (resv.status !== 'Completed') return NextResponse.json({ error: 'Only Completed can issue stamp' }, { status: 400 });
 
-  // ✅ user_id는 안 보내도 됨(트리거가 reservation.user_id로 맞춤)
-  const { data, error } = await gate.supabase
+  const { data, error } = await supabaseAdmin
     .from('stamps')
-    .insert({ reservation_id, issued_by: gate.user.id })
-    .select()
-    .single();
+    .insert({
+      user_id: resv.user_id,
+      reservation_id: resv.id,
+      issued_by: gate.userId,
+    })
+    .select('*')
+    .maybeSingle();
 
-  // 여기서 Completed 아니면 DB 트리거가 에러를 던짐
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }

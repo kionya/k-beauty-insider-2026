@@ -20,15 +20,15 @@ export async function POST(req: NextRequest) {
   const gate = await requireAdmin(req);
   if (!gate.ok) return gate.res;
 
-  const body = await req.json().catch(() => null);
-  const items = Array.isArray(body) ? body : body?.items;
+  const body = await req.json().catch(() => ({}));
+  const items = Array.isArray(body?.items) ? body.items : null;
 
-  if (!Array.isArray(items)) {
-    return NextResponse.json({ error: 'Invalid body. Expect array or {items:[]}' }, { status: 400 });
+  if (!items || items.length === 0) {
+    return NextResponse.json({ error: 'items[] required' }, { status: 400 });
   }
 
-  const { data, error } = await supabaseAdmin.from('procedures').insert(items).select();
-
+  const { error } = await supabaseAdmin.from('procedures').insert(items);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  return NextResponse.json({ ok: true });
 }

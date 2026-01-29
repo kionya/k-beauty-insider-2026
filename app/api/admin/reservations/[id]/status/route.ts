@@ -13,11 +13,11 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const rid = Number(id);
   if (!Number.isFinite(rid)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
-  const body = await req.json().catch(() => null);
-  const status = body?.status as string | undefined;
+  const body = await req.json().catch(() => ({}));
+  const status = String(body?.status ?? '');
 
   const allowed = new Set(['Pending', 'Confirmed', 'Completed', 'Cancelled']);
-  if (!status || !allowed.has(status)) {
+  if (!allowed.has(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     .update({ status })
     .eq('id', rid)
     .select('*')
-    .single();
+    .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
