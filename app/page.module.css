@@ -44,6 +44,12 @@
   gap: 10px;
 }
 
+/* Force "serif" class to be professional sans */
+.serif {
+  font-family: var(--font-sans) !important;
+  letter-spacing: -0.02em;
+}
+
 /* ---------- Header / Nav ---------- */
 .header {
   position: sticky;
@@ -146,7 +152,8 @@
   margin: 16px 0 10px;
   font-size: 52px;
   line-height: 1.06;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.05em;
+  font-weight: 900;
 }
 
 .lead {
@@ -422,9 +429,10 @@
   color: rgba(255,255,255,0.82);
 }
 
-.priceStrong {
-  font-weight: 1000;
-  color: var(--brand);
+.priceStrong,
+.priceCardPrice {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* ---------- Price List: desktop table ---------- */
