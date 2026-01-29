@@ -75,8 +75,10 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1,h2,h3{
-  letter-spacing: var(--ls-tight);
+h1, h2, h3,
+.serif,
+.serif * {
+  font-family: var(--font-sans) !important;
 }
 
 code, pre, .mono{
@@ -138,4 +140,8 @@ button {
   :where(button, a, input, select, textarea){
     transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
   }
+}
+/* Force all headings to Inter/sans */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans) !important;
 }
