@@ -60,6 +60,11 @@ export default function AdminPage() {
   useEffect(() => {
     const run = async () => {
       try {
+
+        // ✅ [여기 추가] 세션 확인 로그
+        const { data: sess } = await supabase.auth.getSession();
+        console.log('ADMIN session?', sess.session);
+        
         const { data: userRes, error: userErr } = await supabase.auth.getUser();
         const user = userRes?.user;
 
