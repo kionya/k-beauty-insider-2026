@@ -1,51 +1,55 @@
 // app/api/admin/_supabase.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// DB 작업은 service role로 (RLS 우회)
-export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
+export const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
 });
 
-// 요청의 Bearer 토큰으로 "로그인 유저" 확인용 클라이언트
-function supabaseUserClient(token: string) {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+type AdminGateOk = { ok: true; user: User; userId: string; token: string };
+type AdminGateFail = { ok: false; res: NextResponse };
+export type AdminGate = AdminGateOk | AdminGateFail;
 
-export async function requireAdmin(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+export async function requireAdmin(req: NextRequest): Promise<AdminGate> {
+  const auth = req.headers.get('authorization') ?? '';
+  const m = auth.match(/^Bearer\s+(.+)$/i);
 
-  if (!token) {
-    return NextResponse.json({ error: 'Missing Bearer token' }, { status: 401 });
+  if (!m) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: 'Missing Bearer token' }, { status: 401 }),
+    };
   }
 
-  // 1) 토큰이 유효한지(로그인 유저인지) 확인
-  const userClient = supabaseUserClient(token);
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  const token = m[1];
 
-  const user = userData?.user;
-  if (userErr || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  const user = data?.user;
+
+  if (error || !user) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: 'Invalid token' }, { status: 401 }),
+    };
   }
 
-  // 2) profiles에서 role 확인 (service role로 조회: RLS 영향 제거)
   const { data: profile, error: profErr } = await supabaseAdmin
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   if (profErr || profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden (admin only)' }, { status: 403 });
+    return {
+      ok: false,
+      res: NextResponse.json({ error: 'Forbidden (admin only)' }, { status: 403 }),
+    };
   }
 
-  return { user, userId: user.id, token };
+  return { ok: true, user, userId: user.id, token };
 }
