@@ -34,6 +34,7 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  color-scheme: dark;
 }
 
 a { color: inherit; }
@@ -50,6 +51,17 @@ a { color: inherit; }
 button {
   font-family: inherit;
 }
+
+.select {
+  color-scheme: dark; /* 셀렉트만 다크 스킴 강제 */
+}
+
+.select option,
+.select optgroup {
+  background-color: #0b0f14;
+  color: rgba(255,255,255,0.92);
+}
+
 
 @media (max-width: 640px){
   .container { width: calc(100% - 28px); }
