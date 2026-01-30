@@ -25,6 +25,21 @@ export async function POST(req: NextRequest) {
     await requireAdmin(req);
 
     const body = await req.json();
+
+    // Excel 업로드는 { items: [...] } 형태로 들어오는 케이스가 많음
+    const items = Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : null;
+
+    if (items) {
+      const { data, error } = await supabaseAdmin
+        .from("procedures")
+        .insert(items)
+        .select("id");
+
+      if (error) throw error;
+      return json({ ok: true, inserted: data?.length ?? 0 }, 201);
+    }
+
+    // 단건 생성
     const { data, error } = await supabaseAdmin
       .from("procedures")
       .insert(body)
@@ -37,3 +52,4 @@ export async function POST(req: NextRequest) {
     return handleRouteError(e);
   }
 }
+

@@ -10,8 +10,7 @@ export default function AdminPage() {
 
   // Auth gates
   const [isAdmin, setIsAdmin] = useState(false);
-  const [password, setPassword] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Data
   const [procedures, setProcedures] = useState<any[]>([]);
@@ -54,63 +53,43 @@ export default function AdminPage() {
     setStamps(stampsJson.data ?? []);
   };
 
-  const canAccess = useMemo(() => isAdmin || isAuthenticated, [isAdmin, isAuthenticated]);
+    const canAccess = useMemo(() => isAdmin, [isAdmin]);
 
-  // 1) Admin role check (Supabase 로그인 기반)
+  // 1) Admin role check (서버 gate 기준으로 단일화)
   useEffect(() => {
     const run = async () => {
       try {
-
-        // ✅ [여기 추가] 세션 확인 로그
         const { data: sess } = await supabase.auth.getSession();
-        console.log('ADMIN session?', sess.session);
+        const session = sess.session;
 
-        const { data: userRes, error: userErr } = await supabase.auth.getUser();
-        const user = userRes?.user;
-
-        if (userErr) {
-          // 로그인 세션이 없거나 오류면 admin false 유지
+        if (!session) {
           setIsAdmin(false);
+          setUserEmail(null);
           return;
         }
 
-        if (!user) {
-          setIsAdmin(false);
-          return;
-        }
+        setUserEmail(session.user?.email ?? null);
 
-        // profiles row가 없거나 RLS로 막혀도 죽지 않게 처리
-        const { data: profile, error: profErr } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (!profErr && profile?.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
+        // 서버 requireAdmin 기준으로 최종 판정
+        await apiFetch('/api/admin/me');
+        setIsAdmin(true);
+      } catch (e) {
+        setIsAdmin(false);
       } finally {
         setLoading(false);
       }
     };
 
     run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+;
 
   useEffect(() => {
     if (!canAccess) return;
     fetchAllData(); // ✅ 위에서 정의한 apiFetch 기반 fetchAllData 호출
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess]);
-
-
-  const handleLogin = () => {
-    // TODO: 하드코딩 대신 ENV 권장. 일단 현재 패턴 유지.
-    if (password === '1234') setIsAuthenticated(true);
-    else alert('Wrong Password!');
-  };
 
   const handleUpdate = async (id: number, field: string, value: any) => {
     setProcedures((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
@@ -231,26 +210,40 @@ export default function AdminPage() {
     );
   }
 
-  // ✅ 권한 없으면 로그인 폼
+  // ✅ 권한 없으면 안내
   if (!canAccess) {
     return (
       <div className="page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 40 }}>
-        <div className="card" style={{ width: 360, padding: 40, textAlign: 'center' }}>
-          <h2 className="title" style={{ marginBottom: 20 }}>
-            Admin Access
-          </h2>
-          <input
-            type="password"
-            onChange={(e) => setPassword(e.target.value)}
-            className="input"
-            style={{ width: '100%', marginBottom: 15 }}
-            placeholder="Enter Password"
-          />
-          <button onClick={handleLogin} className="btnPrimary" style={{ width: '100%' }}>
-            Login
-          </button>
-          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-            (Supabase admin role 로그인 시 자동 통과)
+        <div className="card" style={{ width: 420, padding: 32 }}>
+          <h2 className="title" style={{ marginBottom: 10 }}>Admin Access Required</h2>
+          <p className="subtitle" style={{ marginBottom: 16 }}>
+            이 계정은 admin 권한이 아닙니다. Supabase에서 profiles.role을 admin으로 설정한 뒤 다시 로그인하세요.
+          </p>
+
+          <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>
+            현재 로그인: <b>{userEmail ?? '-'}</b>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="btnPrimary"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                location.href = '/';
+              }}
+            >
+              로그아웃
+            </button>
+
+            <Link href="/" className="btnGhost">
+              홈으로
+            </Link>
+          </div>
+
+          <div style={{ marginTop: 14, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>
+            Supabase SQL 예시:<br/>
+            <code>update profiles set role='admin' where id='&lt;auth_uid&gt;';</code><br/>
+            (profiles가 <code>user_id</code> 컬럼을 쓰는 스키마면 <code>where user_id='&lt;auth_uid&gt;'</code>)
           </div>
         </div>
       </div>
@@ -266,7 +259,7 @@ export default function AdminPage() {
           <p className="subtitle">Manage procedures, reservations, and stamps.</p>
         </div>
         <div className="controlsRow">
-          <label className="btnPrimary" style={{ background: 'var(--brand-2)', color: 'black', cursor: 'pointer' }}>
+          <label className="btnPrimary" style={{ background: 'var(--brand)', color: 'black', cursor: 'pointer' }}>
             <i className="fa-solid fa-file-excel" style={{ marginRight: 8 }} /> Upload Excel
             <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ display: 'none' }} />
           </label>

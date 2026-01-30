@@ -61,17 +61,24 @@ export async function requireAdmin(req: Request): Promise<{ userId: string; role
   const userId = userData.user.id;
 
   // 2) profiles.role 확인(service-role로 조회)
+  // - 스키마 차이 대응: id 또는 user_id
+  // - 컬럼 차이 대응: role(text) 또는 is_admin(boolean)
   const { data: profile, error: profErr } = await supabaseAdmin
     .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
+    .select("role, is_admin")
+    .or(`id.eq.${userId},user_id.eq.${userId}`)
+    .maybeSingle();
 
-  if (profErr) throw new HttpError(403, "Forbidden (profile not found)");
-  if (!profile?.role) throw new HttpError(403, "Forbidden (no role)");
-  if (profile.role !== "admin") throw new HttpError(403, "Forbidden (admin only)");
+  if (profErr) throw new HttpError(403, "Forbidden (profile lookup failed)");
+  if (!profile) throw new HttpError(403, "Forbidden (profile not found)");
 
-  return { userId, role: profile.role };
+  const role = (profile as any).role as Role | undefined;
+  const isAdminFlag = Boolean((profile as any).is_admin);
+
+  const isAdmin = role === "admin" || isAdminFlag === true;
+  if (!isAdmin) throw new HttpError(403, "Forbidden (admin only)");
+
+  return { userId, role: role ?? (isAdminFlag ? "admin" : "user") };
 }
 
 export function handleRouteError(e: unknown) {
