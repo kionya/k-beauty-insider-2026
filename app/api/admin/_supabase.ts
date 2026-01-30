@@ -1,4 +1,3 @@
-// app/api/admin/_supabase.ts
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
@@ -12,7 +11,15 @@ if (!SUPABASE_URL) throw new Error("Missing env: NEXT_PUBLIC_SUPABASE_URL");
 if (!SUPABASE_ANON_KEY) throw new Error("Missing env: NEXT_PUBLIC_SUPABASE_ANON_KEY");
 if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing env: SUPABASE_SERVICE_ROLE_KEY");
 
-// 서버 전용(절대 클라이언트로 노출 금지): service role
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// 서버 전용(절대 클라이언트로 노출 금지): service role client
 export const supabaseAdmin: SupabaseClient = createClient(
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
@@ -21,14 +28,12 @@ export const supabaseAdmin: SupabaseClient = createClient(
   }
 );
 
-// 요청의 Bearer token으로 유저 컨텍스트 클라이언트 생성(검증용)
+// Bearer token 기반 유저 컨텍스트 클라이언트(유저 검증용)
 export function supabaseUser(accessToken: string): SupabaseClient {
   return createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     },
   });
 }
@@ -41,34 +46,21 @@ export function getBearerToken(req: Request): string {
   return m[1].trim();
 }
 
-export class HttpError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
 export function json(data: unknown, init?: number | ResponseInit) {
   if (typeof init === "number") return NextResponse.json(data, { status: init });
   return NextResponse.json(data, init);
 }
 
-/**
- * admin gate
- * - Bearer token 파싱
- * - token으로 유저 확인 (supabase auth)
- * - profiles.role이 admin인지 확인 (service-role로 조회)
- */
 export async function requireAdmin(req: Request): Promise<{ userId: string; role: Role }> {
   const token = getBearerToken(req);
 
+  // 1) token으로 유저 확인
   const sbUser = supabaseUser(token);
   const { data: userData, error: userErr } = await sbUser.auth.getUser();
   if (userErr || !userData?.user) throw new HttpError(401, "Invalid session");
   const userId = userData.user.id;
 
-  // profiles 테이블은 RLS 때문에 깨질 수 있으므로 service-role로 조회
+  // 2) profiles.role 확인(service-role로 조회)
   const { data: profile, error: profErr } = await supabaseAdmin
     .from("profiles")
     .select("role")
@@ -82,11 +74,11 @@ export async function requireAdmin(req: Request): Promise<{ userId: string; role
   return { userId, role: profile.role };
 }
 
-/**
- * 공통 에러 핸들러(각 route.ts에서 try/catch로 사용)
- */
 export function handleRouteError(e: unknown) {
   if (e instanceof HttpError) return json({ error: e.message }, e.status);
-  const msg = e instanceof Error ? e.message : "Unknown error";
-  return json({ error: msg }, 500);
+
+  // Supabase error 등 Error 타입
+  if (e instanceof Error) return json({ error: e.message }, 500);
+
+  return json({ error: "Unknown error" }, 500);
 }

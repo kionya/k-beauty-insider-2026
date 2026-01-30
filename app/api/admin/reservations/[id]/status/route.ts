@@ -1,15 +1,16 @@
+import { NextRequest } from "next/server";
 import { json, requireAdmin, handleRouteError, supabaseAdmin, HttpError } from "../../../_supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * body: { status: "Pending" | "Completed" | ... }
+ * body: { status: string }
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin(req);
-    const id = params.id;
+    const { id } = await params;
 
     const body = await req.json();
     if (!body?.status) throw new HttpError(400, "Missing status");

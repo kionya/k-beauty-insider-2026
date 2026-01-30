@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from './supabase';
 import styles from './page.module.css';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 type Procedure = {
   id: number;

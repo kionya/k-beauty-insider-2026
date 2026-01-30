@@ -1,9 +1,10 @@
+import { NextRequest } from "next/server";
 import { json, requireAdmin, handleRouteError, supabaseAdmin } from "../_supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     await requireAdmin(req);
 
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     await requireAdmin(req);
 

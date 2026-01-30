@@ -1,12 +1,13 @@
+import { NextRequest } from "next/server";
 import { json, requireAdmin, handleRouteError, supabaseAdmin } from "../../_supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin(req);
-    const id = params.id;
+    const { id } = await params;
 
     const { data, error } = await supabaseAdmin
       .from("stamps")
@@ -21,10 +22,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin(req);
-    const id = params.id;
+    const { id } = await params;
 
     const body = await req.json();
     const { data, error } = await supabaseAdmin
@@ -41,10 +42,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin(req);
-    const id = params.id;
+    const { id } = await params;
 
     const { error } = await supabaseAdmin.from("stamps").delete().eq("id", id);
     if (error) throw error;
