@@ -14,7 +14,8 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/auth/error?reason=missing_code", url));
   }
 
-  const cookieStore = cookies();
+  // ✅ Next 타입이 Promise로 나오는 환경 대응
+  const cookieStore = await cookies();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
