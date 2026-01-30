@@ -5,7 +5,7 @@ type Role = "admin" | "staff" | "user" | string;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL) throw new Error("Missing env: NEXT_PUBLIC_SUPABASE_URL");
 if (!SUPABASE_ANON_KEY) throw new Error("Missing env: NEXT_PUBLIC_SUPABASE_ANON_KEY");
@@ -61,24 +61,18 @@ export async function requireAdmin(req: Request): Promise<{ userId: string; role
   const userId = userData.user.id;
 
   // 2) profiles.role 확인(service-role로 조회)
-  // - 스키마 차이 대응: id 또는 user_id
-  // - 컬럼 차이 대응: role(text) 또는 is_admin(boolean)
+  // ✅ 현재 스키마: public.profiles(id uuid, email text, role text, created_at timestamptz)
   const { data: profile, error: profErr } = await supabaseAdmin
     .from("profiles")
-    .select("role, is_admin")
-    .or(`id.eq.${userId},user_id.eq.${userId}`)
-    .maybeSingle();
+    .select("role")
+    .eq("id", userId)
+    .single();
 
-  if (profErr) throw new HttpError(403, "Forbidden (profile lookup failed)");
-  if (!profile) throw new HttpError(403, "Forbidden (profile not found)");
+  if (profErr) throw new HttpError(500, `profiles lookup failed: ${profErr.message}`);
+  if (!profile?.role) throw new HttpError(403, "Forbidden (no role)");
+  if (profile.role !== "admin") throw new HttpError(403, "Forbidden (admin only)");
 
-  const role = (profile as any).role as Role | undefined;
-  const isAdminFlag = Boolean((profile as any).is_admin);
-
-  const isAdmin = role === "admin" || isAdminFlag === true;
-  if (!isAdmin) throw new HttpError(403, "Forbidden (admin only)");
-
-  return { userId, role: role ?? (isAdminFlag ? "admin" : "user") };
+  return { userId, role: profile.role };
 }
 
 export function handleRouteError(e: unknown) {
