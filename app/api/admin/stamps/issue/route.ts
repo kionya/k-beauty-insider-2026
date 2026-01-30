@@ -1,41 +1,33 @@
-// app/api/admin/stamps/issue/route.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { requireAdmin, supabaseAdmin } from '../../_supabase';
+import { json, requireAdmin, handleRouteError, supabaseAdmin, HttpError } from "../../_supabase";
 
-export async function POST(req: NextRequest) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.res;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  const body = await req.json().catch(() => ({}));
-  const reservation_id = Number(body?.reservation_id);
+/**
+ * body 예시:
+ * { reservation_id: string, ... (스탬프에 필요한 컬럼들) }
+ *
+ * 최종 강제는 DB 트리거가 수행:
+ * - reservation.status != 'Completed' 이면 insert 실패
+ */
+export async function POST(req: Request) {
+  try {
+    await requireAdmin(req);
 
-  if (!Number.isFinite(reservation_id)) {
-    return NextResponse.json({ error: 'Invalid reservation_id' }, { status: 400 });
+    const body = await req.json();
+    if (!body?.reservation_id) throw new HttpError(400, "Missing reservation_id");
+
+    const { data, error } = await supabaseAdmin
+      .from("stamps")
+      .insert(body)
+      .select("*")
+      .single();
+
+    // 트리거가 막으면 여기서 error로 떨어짐 (원하는 동작)
+    if (error) throw error;
+
+    return json({ data }, 201);
+  } catch (e) {
+    return handleRouteError(e);
   }
-
-  // 예약 상태/유저 체크
-  const { data: resv, error: resvErr } = await supabaseAdmin
-    .from('reservations')
-    .select('id,user_id,status')
-    .eq('id', reservation_id)
-    .maybeSingle();
-
-  if (resvErr) return NextResponse.json({ error: resvErr.message }, { status: 500 });
-  if (!resv) return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
-  if (!resv.user_id) return NextResponse.json({ error: 'Guest reservation: no user_id' }, { status: 400 });
-  if (resv.status !== 'Completed') return NextResponse.json({ error: 'Only Completed can issue stamp' }, { status: 400 });
-
-  const { data, error } = await supabaseAdmin
-    .from('stamps')
-    .insert({
-      user_id: resv.user_id,
-      reservation_id: resv.id,
-      issued_by: gate.userId,
-    })
-    .select('*')
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
 }

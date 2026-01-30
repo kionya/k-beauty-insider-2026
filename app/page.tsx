@@ -121,8 +121,16 @@ export default function Home() {
 
   const handleAuth = async () => {
     if (!email || !password) return alert('Enter email/password');
+
     if (authMode === 'SIGNUP') {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
+
       if (error) alert(error.message);
       else {
         alert('Signup successful!');

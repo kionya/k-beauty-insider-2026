@@ -1,17 +1,20 @@
-// app/api/admin/stamps/route.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { requireAdmin, supabaseAdmin } from '../_supabase';
+import { json, requireAdmin, handleRouteError, supabaseAdmin } from "../_supabase";
 
-export async function GET(req: NextRequest) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.res;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  const { data, error } = await supabaseAdmin
-    .from('stamps')
-    .select('*')
-    .order('issued_at', { ascending: false });
+export async function GET(req: Request) {
+  try {
+    await requireAdmin(req);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+    const { data, error } = await supabaseAdmin
+      .from("stamps")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return json({ data });
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }

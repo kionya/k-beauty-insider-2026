@@ -1,41 +1,56 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { requireAdmin, supabaseAdmin } from '../../_supabase';
+import { json, requireAdmin, handleRouteError, supabaseAdmin } from "../../_supabase";
 
-type Ctx = { params: Promise<{ id: string }> };
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest, ctx: Ctx) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.res;
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  try {
+    await requireAdmin(req);
+    const id = params.id;
 
-  const { id } = await ctx.params;
-  const rid = Number(id);
-  if (!Number.isFinite(rid)) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    const { data, error } = await supabaseAdmin
+      .from("reservations")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+    return json({ data });
+  } catch (e) {
+    return handleRouteError(e);
   }
-
-  const { data, error } = await supabaseAdmin
-    .from('reservations')
-    .select('*')
-    .eq('id', rid)
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
 }
 
-export async function DELETE(req: NextRequest, ctx: Ctx) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.res;
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  try {
+    await requireAdmin(req);
+    const id = params.id;
 
-  const { id } = await ctx.params;
-  const rid = Number(id);
-  if (!Number.isFinite(rid)) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    const body = await req.json();
+    const { data, error } = await supabaseAdmin
+      .from("reservations")
+      .update(body)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    return json({ data });
+  } catch (e) {
+    return handleRouteError(e);
   }
+}
 
-  const { error } = await supabaseAdmin.from('reservations').delete().eq('id', rid);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  try {
+    await requireAdmin(req);
+    const id = params.id;
 
-  return NextResponse.json({ ok: true });
+    const { error } = await supabaseAdmin.from("reservations").delete().eq("id", id);
+    if (error) throw error;
+
+    return json({ ok: true });
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }

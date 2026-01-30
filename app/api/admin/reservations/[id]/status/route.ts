@@ -1,34 +1,29 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { requireAdmin, supabaseAdmin } from '../../../_supabase';
+import { json, requireAdmin, handleRouteError, supabaseAdmin, HttpError } from "../../../_supabase";
 
-type Ctx = { params: Promise<{ id: string }> };
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.res;
+/**
+ * body: { status: "Pending" | "Completed" | ... }
+ */
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  try {
+    await requireAdmin(req);
+    const id = params.id;
 
-  const { id } = await ctx.params;
-  const rid = Number(id);
-  if (!Number.isFinite(rid)) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    const body = await req.json();
+    if (!body?.status) throw new HttpError(400, "Missing status");
+
+    const { data, error } = await supabaseAdmin
+      .from("reservations")
+      .update({ status: body.status })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    return json({ data });
+  } catch (e) {
+    return handleRouteError(e);
   }
-
-  const body = await req.json().catch(() => ({}));
-  const status = String(body?.status ?? '');
-
-  const allowed = new Set(['Pending', 'Confirmed', 'Completed', 'Cancelled']);
-  if (!allowed.has(status)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from('reservations')
-    .update({ status })
-    .eq('id', rid)
-    .select('*')
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
 }
