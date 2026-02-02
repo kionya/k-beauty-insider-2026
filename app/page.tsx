@@ -259,6 +259,7 @@ export default function Home() {
 
   // vibe mouse variables
   useEffect(() => {
+    vibeRef.current?.classList.add(styles.revealReady);
     const el = vibeRef.current;
     if (!el) return;
 

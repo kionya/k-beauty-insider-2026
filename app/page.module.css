@@ -1177,19 +1177,29 @@
 
 /* Scroll reveal */
 .page [data-reveal] {
-  opacity: 0;
-  transform: translateY(18px);
+  opacity: 1;
+  transform: none;
   transition: opacity 700ms ease, transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: opacity, transform;
 }
 
-.page .revealOn {
+/* JS 준비(revealReady) 이후에만 숨기고 */
+.page.revealReady [data-reveal]{
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);
+  will-change: opacity, transform;
+}
+
+/* revealOn 되면 보여줌 */
+.page.revealReady .revealOn{
   opacity: 1;
   transform: translateY(0);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .page [data-reveal] {
+/* 모션 최소화 */
+@media (prefers-reduced-motion: reduce){
+  .page.revealReady [data-reveal]{
     opacity: 1;
     transform: none;
     transition: none;
