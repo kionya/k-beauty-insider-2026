@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -18,71 +18,107 @@ type Procedure = {
   is_hot: boolean;
 };
 
-const PARTNERS = [
-  { name: 'MUSE Clinic', category: 'Skin Care', location: 'Gangnam Station' },
-  { name: 'ID Hospital', category: 'Plastic Surgery', location: 'Sinsa' },
-  { name: 'PPEUM Clinic', category: 'Aesthetic', location: 'Sinnonhyeon' },
-  { name: 'DA Plastic', category: 'Surgery', location: 'Gangnam' },
-  { name: 'BANOBAGI', category: 'Global', location: 'Yeoksam' },
-  { name: 'LIENJANG', category: 'Dermatology', location: 'Gangnam' },
-  { name: 'TOXNFILL', category: 'Petit', location: 'Gangnam Station' },
-  { name: 'V.IBE', category: 'Trendy', location: 'Apgujeong' },
+const FEATURED_CLINICS = [
+  { name: 'Elite Plastic Surgery', district: 'Gangnam', rating: 4.9, reviews: 245, priceFromUsd: 2500 },
+  { name: 'Glow Dermatology', district: 'Seocho', rating: 4.8, reviews: 198, priceFromUsd: 800 },
+  { name: 'Beauty Line Clinic', district: 'Gangnam', rating: 5.0, reviews: 132, priceFromUsd: 500 },
 ];
 
-const MAX_STAMPS = 10;
+const WHY_FEATURES = [
+  {
+    title: 'Price Comparison',
+    desc: 'Compare prices across clinics to find the best value.',
+    icon: 'fa-solid fa-scale-balanced',
+  },
+  {
+    title: 'Exclusive Coupons',
+    desc: 'Unlock members-only perks and special offers.',
+    icon: 'fa-solid fa-ticket',
+  },
+  {
+    title: 'Easy Booking',
+    desc: 'Request appointments in minutes with verified partners.',
+    icon: 'fa-solid fa-calendar-check',
+  },
+  {
+    title: 'Verified Clinics',
+    desc: 'Partner clinics are vetted for quality and credibility.',
+    icon: 'fa-solid fa-shield-heart',
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    name: 'Sarah Johnson',
+    text:
+      'Amazing experience. The platform made it easy to compare prices and book my appointment. The clinic was professional and the results exceeded expectations.',
+  },
+  {
+    name: 'Michael Chen',
+    text:
+      'The exclusive coupons saved me hundreds and the booking process was seamless. Customer support was excellent. Highly recommend.',
+  },
+  {
+    name: 'Emma Williams',
+    text:
+      'As an international patient, this platform was a lifesaver. Everything was clear, transparent, and the clinics were well verified.',
+  },
+];
 
 export default function Home() {
-  const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
-  const [exchangeRate, setExchangeRate] = useState<number>(1400);
+  // Data
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
-  // ✅ trendSlider: 드래그 중 클릭 방지용
-  const sliderDraggedRef = useRef(false);
-  const blockClickUntilRef = useRef(0);
 
-  // vibe mouse tracking target
-  const vibeRef = useRef<HTMLElement | null>(null);
-
-  // header scrolled
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  // Auth & Stamps
+  // Auth
   const [user, setUser] = useState<any>(null);
-  const [currentStamps, setCurrentStamps] = useState(0);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Pagination
+  // Exchange / Currency
+  const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
+  const [exchangeRate, setExchangeRate] = useState<number>(1400);
+
+  // Price list pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Drawer (mobile nav)
+  // Mobile drawer
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const fetchMyStamps = async (userId: string) => {
-    const { count, error } = await supabase
-      .from('stamps')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+  // revealReady (JS 실패해도 기본은 보이게)
+  const [revealReady, setRevealReady] = useState(false);
 
-    if (!error && count !== null) setCurrentStamps(count);
+  // Search bar states (UI용)
+  const [searchProcedureId, setSearchProcedureId] = useState<string>('');
+  const [searchLocation, setSearchLocation] = useState<string>('All Districts');
+  const [searchDate, setSearchDate] = useState<string>('');
+
+  const pricesRef = useRef<HTMLElement | null>(null);
+  const featuredRef = useRef<HTMLElement | null>(null);
+
+  // Helpers
+  const getPrice = (krwPrice: number) =>
+    currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / exchangeRate)}`;
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // init load
+  // init
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
-      if (data) setProcedures(data);
+      if (data) setProcedures(data as any);
 
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       setUser(session?.user || null);
-      if (session?.user) fetchMyStamps(session.user.id);
-
       setLoading(false);
     };
 
@@ -90,8 +126,6 @@ export default function Home() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (session?.user) fetchMyStamps(session.user.id);
-      else setCurrentStamps(0);
     });
 
     return () => {
@@ -99,15 +133,12 @@ export default function Home() {
     };
   }, []);
 
-  // header scroll state
+  // revealReady
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 6);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    setRevealReady(true);
   }, []);
 
-  // reveal (intersection observer)
+  // reveal observer
   useEffect(() => {
     const els = Array.from(document.querySelectorAll('[data-reveal]')) as HTMLElement[];
     if (!els.length) return;
@@ -134,106 +165,7 @@ export default function Home() {
     return () => io.disconnect();
   }, [styles.revealOn]);
 
-  // tilt cards
-  useEffect(() => {
-    const cards = Array.from(document.querySelectorAll('[data-tilt]')) as HTMLElement[];
-    if (!cards.length) return;
-
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    if (reduced) return;
-
-    const onMove = (e: PointerEvent) => {
-      const el = e.currentTarget as HTMLElement;
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      const y = (e.clientY - r.top) / r.height;
-      const tx = (x - 0.5) * 10;
-      const ty = (y - 0.5) * 10;
-      el.style.setProperty('--tx', tx.toFixed(2));
-      el.style.setProperty('--ty', ty.toFixed(2));
-    };
-
-    const onLeave = (e: PointerEvent) => {
-      const el = e.currentTarget as HTMLElement;
-      el.style.setProperty('--tx', '0');
-      el.style.setProperty('--ty', '0');
-    };
-
-    cards.forEach((el) => {
-      el.style.setProperty('--tx', '0');
-      el.style.setProperty('--ty', '0');
-      el.addEventListener('pointermove', onMove as any, { passive: true });
-      el.addEventListener('pointerleave', onLeave as any, { passive: true });
-    });
-
-    return () => {
-      cards.forEach((el) => {
-        el.removeEventListener('pointermove', onMove as any);
-        el.removeEventListener('pointerleave', onLeave as any);
-      });
-    };
-  }, []);
-
-  // trending slider drag
-  useEffect(() => {
-    const track = document.getElementById('trendSlider') as HTMLElement | null;
-    if (!track) return;
-
-    let isDown = false;
-    let startX = 0;
-    let startScrollLeft = 0;
-
-    const DRAG_THRESHOLD = 6; // px
-
-    const onDown = (e: PointerEvent) => {
-      isDown = true;
-      sliderDraggedRef.current = false;
-
-      track.classList.add(styles.dragging);
-      track.setPointerCapture(e.pointerId);
-
-      startX = e.clientX;
-      startScrollLeft = track.scrollLeft;
-    };
-
-    const onMove = (e: PointerEvent) => {
-      if (!isDown) return;
-
-      const dx = e.clientX - startX;
-
-      if (Math.abs(dx) > DRAG_THRESHOLD) {
-        sliderDraggedRef.current = true;
-      }
-
-      track.scrollLeft = startScrollLeft - dx;
-    };
-
-    const endDrag = () => {
-      if (!isDown) return;
-      isDown = false;
-      track.classList.remove(styles.dragging);
-
-      // 드래그가 있었다면 잠깐 클릭 차단
-      if (sliderDraggedRef.current) {
-        blockClickUntilRef.current = Date.now() + 250;
-      }
-    };
-
-      track.addEventListener('pointerdown', onDown);
-      track.addEventListener('pointermove', onMove);
-      track.addEventListener('pointerup', endDrag);
-      track.addEventListener('pointercancel', endDrag);
-
-    return () => {
-      track.removeEventListener('pointerdown', onDown);
-      track.removeEventListener('pointermove', onMove);
-      track.removeEventListener('pointerup', endDrag);
-      track.removeEventListener('pointercancel', endDrag);
-    };
-  }, [styles.dragging]);
-
-
-  // exchange rate
+  // exchange rate (front constant 금지, API only)
   useEffect(() => {
     const loadRate = async () => {
       try {
@@ -255,31 +187,6 @@ export default function Home() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  // vibe mouse variables
-  useEffect(() => {
-    vibeRef.current?.classList.add(styles.revealReady);
-    const el = vibeRef.current;
-    if (!el) return;
-
-    let raf = 0;
-    const onMove = (e: PointerEvent) => {
-      const rect = el.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        el.style.setProperty('--mx', String(x));
-        el.style.setProperty('--my', String(y));
-      });
-    };
-
-    window.addEventListener('pointermove', onMove, { passive: true });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('pointermove', onMove);
-    };
   }, []);
 
   // drawer open => lock scroll
@@ -307,7 +214,7 @@ export default function Home() {
 
       if (error) alert(error.message);
       else {
-        alert('Signup successful!');
+        alert('Signup successful! Check your email to confirm.');
         setIsLoginModalOpen(false);
       }
     } else {
@@ -321,16 +228,24 @@ export default function Home() {
     await supabase.auth.signOut();
   };
 
-  const getPrice = (krwPrice: number) =>
-    currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / exchangeRate)}`;
-
+  // price list pagination
+  const totalPages = Math.max(1, Math.ceil(procedures.length / itemsPerPage));
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = procedures.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.max(1, Math.ceil(procedures.length / itemsPerPage));
 
-  const handleNextPage = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
-  const handlePrevPage = () => currentPage > 1 && setCurrentPage(currentPage - 1);
+  const priceListItems = useMemo(() => procedures.slice(indexOfFirstItem, indexOfLastItem), [procedures, indexOfFirstItem, indexOfLastItem]);
+
+  const popularProcedures = useMemo(() => procedures.slice(0, 8), [procedures]);
+  const procedureOptions = useMemo(() => procedures.slice(0, 50), [procedures]); // UI용
+
+  const handleNextPage = () => currentPage < totalPages && setCurrentPage((p) => p + 1);
+  const handlePrevPage = () => currentPage > 1 && setCurrentPage((p) => p - 1);
+
+  const onSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // 현재는 랜딩 UX용: Featured로 이동 후, 이후 필터 적용/페이지 분리로 확장 가능
+    featuredRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   if (loading) {
     return (
@@ -340,51 +255,44 @@ export default function Home() {
     );
   }
 
-  const trendingProcedures = procedures.filter((p) => p.rank <= 5);
-
   return (
-    <main ref={vibeRef} className={styles.page}>
-      {/* vibe background */}
-      <div className={styles.vibeBg} aria-hidden="true">
-        <div className={styles.vibeGradientA} />
-        <div className={styles.vibeGradientB} />
-        <div className={styles.vibeGrid} />
-        <div className={styles.vibeNoise} />
-      </div>
-
+    <main className={styles.page} data-reveal-ready={revealReady ? '1' : '0'}>
       {/* Header */}
-      <header className={`${styles.header} ${isScrolled ? styles.headerScrolled : ''}`}>
+      <header className={styles.header}>
         <div className={`container ${styles.navWrap}`}>
-          <div className={styles.logo}>
-            <span className={styles.logoMark} aria-hidden="true" />
-            <div className={styles.logoName}>
-              K-Beauty <span>Insider</span>
-            </div>
+          <div className={styles.brand}>
+            <span className={styles.brandIcon} aria-hidden="true">
+              <i className="fa-solid fa-crown" />
+            </span>
+            <span className={styles.brandName}>K-Beauty Insider</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <nav className={styles.nav}>
-              {user && <a href="#benefits">Loyalty</a>}
-              <a href="#ranking">Trends</a>
-              <a href="#prices">Prices</a>
-              <a href="#partners" className={styles.navCta}>
-                Free Pass
-              </a>
+          <nav className={styles.nav}>
+            <a href="#home">Home</a>
+            <a href="#featured">Clinics</a>
+            <a href="#procedures">Procedures</a>
+            <a href="#about">About</a>
+          </nav>
 
-              {user ? (
-                <button className={styles.btnGhost} onClick={handleLogout} type="button">
+          <div className={styles.navActions}>
+            {user ? (
+              <>
+                <button className={styles.btnGhost} onClick={() => scrollToId('prices')} type="button">
+                  Pricing
+                </button>
+                <button className={styles.btnPrimary} onClick={handleLogout} type="button">
                   Logout
                 </button>
-              ) : (
-                <button className={styles.btnPrimary} onClick={() => setIsLoginModalOpen(true)} type="button">
-                  Login
-                </button>
-              )}
+              </>
+            ) : (
+              <button className={styles.btnPrimary} onClick={() => setIsLoginModalOpen(true)} type="button">
+                Sign in
+              </button>
+            )}
 
-              <Link href="/admin" className={styles.iconLink} aria-label="Admin">
-                <i className="fa-solid fa-gear"></i>
-              </Link>
-            </nav>
+            <Link href="/admin" className={styles.iconLink} aria-label="Admin">
+              <i className="fa-solid fa-gear" />
+            </Link>
 
             <button
               className={styles.mobileNavBtn}
@@ -393,192 +301,195 @@ export default function Home() {
               aria-expanded={isDrawerOpen}
               onClick={() => setIsDrawerOpen(true)}
             >
-              <i className="fa-solid fa-bars"></i>
+              <i className="fa-solid fa-bars" />
             </button>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className={styles.hero} data-reveal>
-        <div className="container">
-          <div className={styles.heroGrid}>
-            <div>
-              <span className={styles.kicker}>
-                <i className="fa-solid fa-shield-heart" /> Premium Medical Concierge
-              </span>
-              <h1 className={styles.h1}>
-                Discover the True Price <br />
-                of Gangnam Beauty.
-              </h1>
-              <p className={styles.lead}>Transparent pricing from the top clinics in Korea.</p>
+      <section id="home" className={styles.hero} data-reveal>
+        <div className={`container ${styles.heroGrid}`}>
+          <div className={styles.heroLeft} data-reveal>
+            <h1 className={styles.h1}>
+              Discover Premium <span>K-Beauty Clinics</span>
+            </h1>
+            <p className={styles.lead}>
+              Compare prices, request appointments, and get exclusive benefits for top clinics in Gangnam &amp; Seocho.
+            </p>
 
-              <div className={styles.heroActions}>
-                <a href="#prices" className={styles.btnPrimary}>
-                  View Price List
-                </a>
-                <a href="#benefits" className={styles.btnGhost}>
-                  Loyalty Program
-                </a>
-              </div>
+            <div className={styles.heroActions}>
+              <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('featured')}>
+                Explore Clinics
+              </button>
+              <button className={styles.btnSoft} type="button" onClick={() => scrollToId('why')}>
+                Learn More
+              </button>
+            </div>
+          </div>
+
+          {/* Placeholder image panel */}
+          <aside className={styles.heroRight} data-reveal aria-label="Hero image placeholder">
+            <div className={styles.heroImage} />
+          </aside>
+        </div>
+
+        {/* Floating search card */}
+        <div className={`container ${styles.searchDock}`} data-reveal>
+          <form className={styles.searchCard} onSubmit={onSearch}>
+            <div className={styles.searchField}>
+              <label className={styles.searchLabel}>Procedure</label>
+              <select
+                className={styles.searchControl}
+                value={searchProcedureId}
+                onChange={(e) => setSearchProcedureId(e.target.value)}
+              >
+                <option value="">Select procedure</option>
+                {procedureOptions.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <aside className={`${styles.heroPanel} ${styles.tilt}`} data-tilt data-reveal>
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-chart-line"></i>
-                </div>
-                <div>
-                  <div className={styles.metricTitle}>Monthly Trends</div>
-                  <p className={styles.metricText}>Top procedures highlighted from Supabase ranking.</p>
-                </div>
-              </div>
+            <div className={styles.searchField}>
+              <label className={styles.searchLabel}>Location</label>
+              <select
+                className={styles.searchControl}
+                value={searchLocation}
+                onChange={(e) => setSearchLocation(e.target.value)}
+              >
+                <option>All Districts</option>
+                <option>Gangnam</option>
+                <option>Seocho</option>
+                <option>Sinsa</option>
+                <option>Apgujeong</option>
+              </select>
+            </div>
 
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-coins"></i>
-                </div>
-                <div>
-                  <div className={styles.metricTitle}>Transparent Pricing</div>
-                  <p className={styles.metricText}>KRW / USD toggle (exchange from ENV later).</p>
-                </div>
-              </div>
+            <div className={styles.searchField}>
+              <label className={styles.searchLabel}>Date</label>
+              <input
+                className={styles.searchControl}
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+              />
+            </div>
 
-              <div className={styles.metricRow}>
-                <div className={styles.metricIcon}>
-                  <i className="fa-solid fa-stamp"></i>
+            <button className={styles.searchBtn} type="submit">
+              <i className="fa-solid fa-magnifying-glass" /> Search
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {/* Why choose */}
+      <section id="why" className={styles.section} data-reveal>
+        <div className="container">
+          <div className={styles.sectionHead} data-reveal>
+            <h2 className={styles.h2}>Why Choose K-Beauty Insider?</h2>
+            <p className={styles.sub}>Your trusted partner for Korean beauty procedures.</p>
+          </div>
+
+          <div className={styles.featureGrid}>
+            {WHY_FEATURES.map((f) => (
+              <article key={f.title} className={styles.featureCard} data-reveal>
+                <div className={styles.featureIcon} aria-hidden="true">
+                  <i className={f.icon} />
                 </div>
-                <div>
-                  <div className={styles.metricTitle}>Loyalty Rewards</div>
-                  <p className={styles.metricText}>Collect stamps and unlock a free procedure.</p>
-                </div>
-              </div>
-            </aside>
+                <h3 className={styles.cardTitle}>{f.title}</h3>
+                <p className={styles.cardDesc}>{f.desc}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Loyalty */}
-      <section id="benefits" className={`${styles.section} ${styles.sectionAlt}`} data-reveal>
+      {/* Featured clinics */}
+      <section id="featured" ref={(el) => (featuredRef.current = el)} className={styles.sectionAlt} data-reveal>
         <div className="container">
-          <div className={styles.sectionHeader}>
+          <div className={styles.sectionHeadRow} data-reveal>
             <div>
-              <div className={styles.title}>Loyalty Program</div>
-              <div className={styles.subtitle}>Collect 10 stamps to get a free procedure.</div>
+              <h2 className={styles.h2}>Featured Clinics</h2>
+              <p className={styles.sub}>Top-rated clinics in Gangnam &amp; Seocho.</p>
             </div>
+            <button className={styles.btnSoftSmall} type="button" onClick={() => scrollToId('procedures')}>
+              View All Clinics
+            </button>
           </div>
 
-          <div className={`${styles.card} ${styles.lockWrap}`} data-reveal>
-            {!user && (
-              <div className={styles.lockOverlay}>
-                <div className={styles.lockTitle}>Members Only Benefit</div>
-                <button className={styles.btnPrimary} onClick={() => setIsLoginModalOpen(true)} type="button">
-                  Login to Check Stamps
-                </button>
-              </div>
-            )}
-
-            <div className={styles.cardInner}>
-              <div className={styles.loyaltyTop}>
-                <div>
-                  <div className={styles.title} style={{ fontSize: 18 }}>
-                    My Stamps
+          <div className={styles.clinicGrid}>
+            {FEATURED_CLINICS.map((c) => (
+              <article key={c.name} className={styles.clinicCard} data-reveal>
+                <div className={styles.clinicThumb} aria-hidden="true" />
+                <div className={styles.clinicBody}>
+                  <div className={styles.clinicTop}>
+                    <span className={styles.pill}>{c.district}</span>
+                    <span className={styles.rating}>
+                      <i className="fa-solid fa-star" aria-hidden="true" /> {c.rating.toFixed(1)} <span>({c.reviews})</span>
+                    </span>
                   </div>
-                  <div className={styles.subtitle}>Visit any partner clinic to earn stamps.</div>
-                </div>
-                <div className={styles.stampCount}>
-                  {currentStamps} / {MAX_STAMPS}
-                </div>
-              </div>
+                  <h3 className={styles.cardTitle}>{c.name}</h3>
+                  <p className={styles.cardDesc}>Verified partner clinic • English-friendly support</p>
 
-              <div className={styles.stampsGrid}>
-                {Array.from({ length: MAX_STAMPS }).map((_, idx) => {
-                  const on = idx < currentStamps;
-                  return (
-                    <div key={idx} className={`${styles.stamp} ${on ? styles.stampOn : ''}`}>
-                      {on ? <i className="fa-solid fa-check"></i> : idx + 1}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {currentStamps >= MAX_STAMPS ? (
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <button className={styles.rewardBtn} type="button">
-                    Select Free Procedure
-                  </button>
+                  <div className={styles.clinicBottom}>
+                    <div className={styles.priceFrom}>${c.priceFromUsd.toLocaleString()}+</div>
+                    <button className={styles.btnPrimarySmall} type="button" onClick={() => scrollToId('prices')}>
+                      View Details
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className={styles.rewardBox}>{MAX_STAMPS - currentStamps} more visits needed for a free reward.</div>
-              )}
-            </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Trending */}
-      <section id="ranking" className={styles.section} data-reveal>
+      {/* Popular procedures */}
+      <section id="procedures" className={styles.section} data-reveal>
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <div className={styles.title}>Trending Now</div>
-              <div className={styles.subtitle}>Most requested procedures this month.</div>
-            </div>
+          <div className={styles.sectionHead} data-reveal>
+            <h2 className={styles.h2}>Popular Procedures</h2>
+            <p className={styles.sub}>Browse our most sought-after treatments.</p>
           </div>
 
-          <div className={styles.sliderWrap}>
-            <div className={styles.sliderTrack} 
-              id="trendSlider"
-              onClickCapture={(e) => {
-                if (Date.now() < blockClickUntilRef.current) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-              }}
-            >
-              {trendingProcedures.map((proc) => (
-                <Link href={`/procedures/${proc.id}`} key={proc.id}>
-                  <article className={`${styles.trendCard} ${styles.tilt}`} data-tilt data-reveal>
-                    <div>
-                      <div className={styles.trendTop}>
-                        <div className={styles.rankTag}>Rank 0{proc.rank}</div>
-                        {proc.is_hot && <span className={styles.badgeHot}>HOT</span>}
-                      </div>
-                      <div className={styles.trendTitle}>{proc.name}</div>
-                      <p className={styles.trendDesc}>{proc.description}</p>
-                    </div>
-
-                    <div className={styles.trendBottom}>
-                      <span style={{ color: 'rgba(255,255,255,0.62)' }}>Avg. Price</span>
-                      <span className={styles.priceStrong}>{getPrice(proc.price_krw)}</span>
-                    </div>
-                  </article>
-                </Link>
-              ))}
-            </div>
+          <div className={styles.procGrid}>
+            {popularProcedures.map((p) => (
+              <Link key={p.id} href={`/procedures/${p.id}`} className={styles.procCard} data-reveal>
+                <div className={styles.procBadge} aria-hidden="true">
+                  <i className="fa-solid fa-sparkles" />
+                </div>
+                <div className={styles.procName}>{p.name}</div>
+                <div className={styles.procMeta}>
+                  From <strong>{getPrice(p.price_krw)}</strong>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Prices */}
-      <section id="prices" className={styles.section} data-reveal>
+      {/* Prices (kept for data integrity + mobile cards) */}
+      <section id="prices" ref={(el) => (pricesRef.current = el)} className={styles.sectionAlt} data-reveal>
         <div className="container">
-          <div className={styles.sectionHeader}>
+          <div className={styles.sectionHeadRow} data-reveal>
             <div>
-              <div className={styles.title}>Official Price List</div>
-              <div className={styles.subtitle}>Paginated (10 per page).</div>
+              <h2 className={styles.h2}>Official Price List</h2>
+              <p className={styles.sub}>Paginated (10 per page). Exchange rate from server API.</p>
             </div>
 
             <div className={styles.toggle}>
               <button
-                className={`${styles.toggleBtn} ${currency === 'USD' ? styles.toggleBtnActive : ''}`}
+                className={`${styles.toggleBtn} ${currency === 'USD' ? styles.toggleActive : ''}`}
                 onClick={() => setCurrency('USD')}
                 type="button"
               >
                 USD
               </button>
               <button
-                className={`${styles.toggleBtn} ${currency === 'KRW' ? styles.toggleBtnActive : ''}`}
+                className={`${styles.toggleBtn} ${currency === 'KRW' ? styles.toggleActive : ''}`}
                 onClick={() => setCurrency('KRW')}
                 type="button"
               >
@@ -587,63 +498,50 @@ export default function Home() {
             </div>
           </div>
 
-          <div className={styles.tableShell} data-reveal>
+          <div className={styles.priceShell} data-reveal>
+            {/* Desktop table */}
             <table className={styles.table}>
-              <thead className={styles.thead}>
+              <thead>
                 <tr>
-                  <th className={styles.thNum} style={{ width: 84 }}>
-                    Rank
-                  </th>
+                  <th style={{ width: 84 }}>Rank</th>
                   <th>Procedure</th>
                   <th>Top Clinics</th>
-                  <th className={styles.thNum} style={{ width: 160 }}>
-                    Gangnam Price
-                  </th>
-                  <th className={styles.thAction} style={{ width: 120 }}>
-                    Action
-                  </th>
+                  <th style={{ width: 160, textAlign: 'right' }}>Price</th>
+                  <th style={{ width: 120, textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {currentItems.map((proc) => {
+                {priceListItems.map((proc) => {
                   const displayedClinics = proc.clinics?.slice(0, 2) ?? [];
                   const extraCount = (proc.clinics?.length ?? 0) - displayedClinics.length;
 
                   return (
-                    <tr key={proc.id} className={styles.trow}>
-                      <td className={styles.tdNum} style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 1000 }}>
-                        {proc.rank}
-                      </td>
-
+                    <tr key={proc.id}>
+                      <td className={styles.tdDim}>{proc.rank}</td>
                       <td>
-                        <div className={styles.procName}>{proc.name}</div>
-                        <div className={styles.procMeta}>{proc.category}</div>
+                        <div className={styles.tProcName}>{proc.name}</div>
+                        <div className={styles.tProcMeta}>{proc.category}</div>
                       </td>
-
                       <td>
                         {displayedClinics.length ? (
                           <div className={styles.clinicList}>
                             {displayedClinics.map((c, i) => (
                               <div key={i} className={styles.clinicItem}>
-                                <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }} />
+                                <i className="fa-solid fa-hospital" style={{ marginRight: 8 }} />
                                 {c.split(':')[0]}
                               </div>
                             ))}
                             {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
                           </div>
                         ) : (
-                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>-</span>
+                          <span className={styles.tdDim}>-</span>
                         )}
                       </td>
-
-                      <td className={`${styles.tdNum} ${styles.priceStrong}`} style={{ color: 'var(--brand)' }}>
-                        {getPrice(proc.price_krw)}
-                      </td>
-
-                      <td className={styles.tdAction}>
+                      <td className={styles.tPrice}>{getPrice(proc.price_krw)}</td>
+                      <td style={{ textAlign: 'right' }}>
                         <Link href={`/procedures/${proc.id}`}>
-                          <button className={styles.detailBtn} type="button">
+                          <button className={styles.btnPrimarySmall} type="button">
                             Details
                           </button>
                         </Link>
@@ -653,6 +551,51 @@ export default function Home() {
                 })}
               </tbody>
             </table>
+
+            {/* Mobile cards */}
+            <div className={styles.mobileCards}>
+              {priceListItems.map((proc) => {
+                const displayedClinics = proc.clinics?.slice(0, 2) ?? [];
+                const extraCount = (proc.clinics?.length ?? 0) - displayedClinics.length;
+
+                return (
+                  <article key={proc.id} className={styles.mobileCard}>
+                    <div className={styles.mobileTop}>
+                      <div>
+                        <div className={styles.mobileRank}>Rank {proc.rank}</div>
+                        <div className={styles.mobileName}>{proc.name}</div>
+                        <div className={styles.mobileMeta}>{proc.category}</div>
+                      </div>
+                      <div className={styles.mobilePrice}>{getPrice(proc.price_krw)}</div>
+                    </div>
+
+                    <div className={styles.mobileClinics}>
+                      {displayedClinics.length ? (
+                        <>
+                          {displayedClinics.map((c, i) => (
+                            <div key={i} className={styles.mobileClinicItem}>
+                              <i className="fa-solid fa-hospital" style={{ marginRight: 8 }} />
+                              {c.split(':')[0]}
+                            </div>
+                          ))}
+                          {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
+                        </>
+                      ) : (
+                        <span className={styles.tdDim}>-</span>
+                      )}
+                    </div>
+
+                    <div className={styles.mobileActions}>
+                      <Link href={`/procedures/${proc.id}`}>
+                        <button className={styles.btnPrimarySmall} type="button">
+                          Details
+                        </button>
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
 
             <div className={styles.pagination}>
               <button className={styles.pageBtn} onClick={handlePrevPage} disabled={currentPage === 1} type="button">
@@ -674,51 +617,108 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Partners */}
-      <section id="partners" className={styles.section} data-reveal>
+      {/* Testimonials */}
+      <section id="about" className={styles.section} data-reveal>
         <div className="container">
-          <div className={styles.sectionHeader}>
-            <div>
-              <div className={styles.title} style={{ color: 'var(--brand)' }}>
-                Free Pass Clinics
-              </div>
-              <div className={styles.subtitle}>
-                Exclusive Benefit: You can redeem your free procedure at these partner clinics.
-              </div>
-            </div>
+          <div className={styles.sectionHead} data-reveal>
+            <h2 className={styles.h2}>What Our Clients Say</h2>
+            <p className={styles.sub}>Real experiences from real people.</p>
           </div>
 
-          <div className={styles.partnerGrid}>
-            {PARTNERS.slice(0, 15).map((p, idx) => (
-                <div key={idx} className={`${styles.partnerCard} ${styles.tilt}`} data-tilt data-reveal>
-                <div className={styles.partnerTag}>
-                  <span className={`${styles.pill} ${styles.pillBrand}`}>FREE PASS</span>
+          <div className={styles.testGrid}>
+            {TESTIMONIALS.map((t) => (
+              <article key={t.name} className={styles.testCard} data-reveal>
+                <div className={styles.testTop}>
+                  <div className={styles.avatar} aria-hidden="true" />
+                  <div>
+                    <div className={styles.testName}>{t.name}</div>
+                    <div className={styles.testStars} aria-hidden="true">
+                      <i className="fa-solid fa-star" />
+                      <i className="fa-solid fa-star" />
+                      <i className="fa-solid fa-star" />
+                      <i className="fa-solid fa-star" />
+                      <i className="fa-solid fa-star" />
+                    </div>
+                  </div>
                 </div>
-
-                <div className={styles.partnerIcon}>
-                  <i className="fa-solid fa-hospital"></i>
-                </div>
-
-                <h3 className={styles.partnerName}>{p.name}</h3>
-                <p className={styles.partnerMeta}>{p.category}</p>
-
-                <div className={styles.partnerLoc}>
-                  <i className="fa-solid fa-location-dot" style={{ marginRight: 6 }} />
-                  {p.location}
-                </div>
-              </div>
+                <p className={styles.testText}>&ldquo;{t.text}&rdquo;</p>
+              </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section id="contact" className={styles.cta} data-reveal>
+        <div className={`container ${styles.ctaInner}`} data-reveal>
+          <h2 className={styles.ctaTitle}>Ready to Transform Your Beauty Journey?</h2>
+          <p className={styles.ctaSub}>Join thousands of satisfied clients who found their perfect clinic.</p>
+          <div className={styles.ctaActions}>
+            <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('featured')}>
+              Get Started Now
+            </button>
+            <button className={styles.btnSoft} type="button" onClick={() => scrollToId('prices')}>
+              Contact Us
+            </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
       <footer className={styles.footer}>
-        <div className="container">
-          <div className={styles.footerBrand}>
-            K-Beauty <span style={{ color: 'var(--brand)', fontStyle: 'italic' }}>Insider</span>
+        <div className={`container ${styles.footerGrid}`}>
+          <div>
+            <div className={styles.footerBrand}>
+              <span className={styles.brandIconSmall} aria-hidden="true">
+                <i className="fa-solid fa-crown" />
+              </span>
+              K-Beauty Insider
+            </div>
+            <p className={styles.footerText}>
+              Your trusted partner for Korean beauty procedures in Gangnam &amp; Seocho.
+            </p>
+            <div className={styles.footerSocial} aria-label="Social links">
+              <a className={styles.socialBtn} href="#home" aria-label="Twitter">
+                <i className="fa-brands fa-x-twitter" />
+              </a>
+              <a className={styles.socialBtn} href="#home" aria-label="Instagram">
+                <i className="fa-brands fa-instagram" />
+              </a>
+              <a className={styles.socialBtn} href="#home" aria-label="YouTube">
+                <i className="fa-brands fa-youtube" />
+              </a>
+            </div>
           </div>
-          <div>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</div>
+
+          <div>
+            <div className={styles.footerHead}>Quick Links</div>
+            <a className={styles.footerLink} href="#home">Home</a>
+            <a className={styles.footerLink} href="#featured">Clinics</a>
+            <a className={styles.footerLink} href="#procedures">Procedures</a>
+            <a className={styles.footerLink} href="#prices">Prices</a>
+          </div>
+
+          <div>
+            <div className={styles.footerHead}>Support</div>
+            <a className={styles.footerLink} href="#contact">Contact</a>
+            <a className={styles.footerLink} href="#about">Reviews</a>
+            <Link className={styles.footerLink} href="/admin">Admin</Link>
+          </div>
+
+          <div>
+            <div className={styles.footerHead}>Newsletter</div>
+            <p className={styles.footerText}>Subscribe to get special offers and updates.</p>
+            <div className={styles.newsletter}>
+              <input className={styles.newsInput} placeholder="Your email" />
+              <button className={styles.newsBtn} type="button" aria-label="Subscribe">
+                <i className="fa-solid fa-arrow-right" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`container ${styles.footerBottom}`}>
+          © 2026 K-Beauty Insider. All rights reserved.
         </div>
       </footer>
 
@@ -733,66 +733,63 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.drawerTop}>
-              <div className={styles.logo}>
-                <span className={styles.logoMark} aria-hidden="true" />
-                <div className={styles.logoName}>
-                  K-Beauty <span>Insider</span>
-                </div>
+              <div className={styles.brand}>
+                <span className={styles.brandIcon} aria-hidden="true">
+                  <i className="fa-solid fa-crown" />
+                </span>
+                <span className={styles.brandName}>K-Beauty Insider</span>
               </div>
 
-              <button
-                className={styles.mobileNavBtn}
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setIsDrawerOpen(false)}
-              >
-                <i className="fa-solid fa-xmark"></i>
+              <button className={styles.mobileNavBtn} type="button" aria-label="Close menu" onClick={() => setIsDrawerOpen(false)}>
+                <i className="fa-solid fa-xmark" />
               </button>
             </div>
 
             <div className={styles.drawerLinks}>
-              {user && (
-                <a className={styles.drawerLink} href="#benefits" onClick={() => setIsDrawerOpen(false)}>
-                  Loyalty <i className="fa-solid fa-chevron-right"></i>
-                </a>
-              )}
-              <a className={styles.drawerLink} href="#ranking" onClick={() => setIsDrawerOpen(false)}>
-                Trends <i className="fa-solid fa-chevron-right"></i>
+              <a className={styles.drawerLink} href="#home" onClick={() => setIsDrawerOpen(false)}>
+                Home <i className="fa-solid fa-chevron-right" />
+              </a>
+              <a className={styles.drawerLink} href="#featured" onClick={() => setIsDrawerOpen(false)}>
+                Clinics <i className="fa-solid fa-chevron-right" />
+              </a>
+              <a className={styles.drawerLink} href="#procedures" onClick={() => setIsDrawerOpen(false)}>
+                Procedures <i className="fa-solid fa-chevron-right" />
               </a>
               <a className={styles.drawerLink} href="#prices" onClick={() => setIsDrawerOpen(false)}>
-                Prices <i className="fa-solid fa-chevron-right"></i>
+                Prices <i className="fa-solid fa-chevron-right" />
               </a>
-              <a className={styles.drawerLink} href="#partners" onClick={() => setIsDrawerOpen(false)}>
-                Free Pass <i className="fa-solid fa-chevron-right"></i>
+              <a className={styles.drawerLink} href="#about" onClick={() => setIsDrawerOpen(false)}>
+                About <i className="fa-solid fa-chevron-right" />
+              </a>
+              <a className={styles.drawerLink} href="#contact" onClick={() => setIsDrawerOpen(false)}>
+                Contact <i className="fa-solid fa-chevron-right" />
               </a>
 
               <Link className={styles.drawerLink} href="/admin" onClick={() => setIsDrawerOpen(false)}>
-                Admin <i className="fa-solid fa-chevron-right"></i>
+                Admin <i className="fa-solid fa-chevron-right" />
               </Link>
 
               {user ? (
                 <button
-                  className={styles.drawerLink}
+                  className={styles.drawerLinkBtn}
                   type="button"
                   onClick={async () => {
                     await handleLogout();
                     setIsDrawerOpen(false);
                   }}
-                  style={{ justifyContent: 'space-between' }}
                 >
-                  Logout <i className="fa-solid fa-arrow-right-from-bracket"></i>
+                  Logout <i className="fa-solid fa-arrow-right-from-bracket" />
                 </button>
               ) : (
                 <button
-                  className={styles.drawerLink}
+                  className={styles.drawerLinkBtn}
                   type="button"
                   onClick={() => {
                     setIsLoginModalOpen(true);
                     setIsDrawerOpen(false);
                   }}
-                  style={{ justifyContent: 'space-between' }}
                 >
-                  Login <i className="fa-solid fa-right-to-bracket"></i>
+                  Sign in <i className="fa-solid fa-right-to-bracket" />
                 </button>
               )}
             </div>
@@ -843,7 +840,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ✅ 반드시 컴포넌트 내부에서 렌더링 */}
       <SpeedInsights />
     </main>
   );
