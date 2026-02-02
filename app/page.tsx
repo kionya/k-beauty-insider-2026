@@ -589,6 +589,51 @@ export default function Home() {
 
           <div className={styles.tableShell} data-reveal>
             <table className={styles.table}>
+              {/* ✅ Mobile Cards (table이 mobile에서 숨겨지므로 카드로 대체) */}
+              <div className={styles.mobileCards}>
+                {currentItems.map((proc) => {
+                  const displayedClinics = proc.clinics?.slice(0, 2) ?? [];
+                  const extraCount = (proc.clinics?.length ?? 0) - displayedClinics.length;
+
+                  return (
+                    <div key={proc.id} className={styles.priceCard} data-reveal>
+                      <div className={styles.priceCardTop}>
+                        <div>
+                          <h3 className={styles.priceCardTitle}>
+                            {proc.rank}. {proc.name}
+                          </h3>
+                          <div className={styles.priceCardMeta}>{proc.category}</div>
+                        </div>
+                        <div className={styles.priceCardPrice}>{getPrice(proc.price_krw)}</div>
+                      </div>
+
+                      <div className={styles.priceCardClinics}>
+                        {displayedClinics.length ? (
+                          <>
+                            {displayedClinics.map((c, i) => (
+                              <div key={i} className={styles.clinicItem}>
+                                <i className="fa-solid fa-hospital" style={{ color: 'var(--brand)' }} />
+                                {c.split(':')[0]}
+                              </div>
+                            ))}
+                            {extraCount > 0 && <div className={styles.moreHint}>+ {extraCount} more</div>}
+                          </>
+                        ) : (
+                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>-</span>
+                        )}
+                      </div>
+
+                      <div className={styles.priceCardActions}>
+                        <Link href={`/procedures/${proc.id}`}>
+                          <button className={styles.detailBtn} type="button">
+                            Details
+                          </button>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
               <thead className={styles.thead}>
                 <tr>
                   <th className={styles.thNum} style={{ width: 84 }}>
