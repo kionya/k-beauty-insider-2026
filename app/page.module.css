@@ -1076,3 +1076,144 @@
   text-decoration: underline;
   cursor: pointer;
 }
+/* =========================
+   VIBE LAYER (style-only)
+   content 유지 / class명 유지
+========================= */
+
+.page{
+  /* 배경/톤 변수: 기존 디자인 유지하면서 분위기만 업그레이드 */
+  --v-bg: #07070a;
+  --v-fg: rgba(255,255,255,.92);
+  --v-muted: rgba(255,255,255,.68);
+  --v-line: rgba(255,255,255,.10);
+  --v-glass: rgba(255,255,255,.06);
+
+  /* 마우스 반응 변수(없으면 기본값) */
+  --mx: .55;
+  --my: .25;
+
+  background: var(--v-bg);
+  color: var(--v-fg);
+
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+/* 배경 레이어 */
+.vibeBg{
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.vibeGradientA{
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(900px 600px at calc(var(--mx)*100%) calc(var(--my)*100%),
+      rgba(255, 120, 0, .22),
+      rgba(255,255,255,0) 60%),
+    radial-gradient(800px 600px at 18% 10%,
+      rgba(140, 60, 255, .18),
+      rgba(255,255,255,0) 62%),
+    radial-gradient(700px 500px at 86% 76%,
+      rgba(0, 190, 255, .14),
+      rgba(255,255,255,0) 60%);
+  filter: blur(18px);
+  animation: vibeFloatA 10s ease-in-out infinite;
+}
+
+@keyframes vibeFloatA{
+  0%,100%{ transform: translate3d(0,0,0) scale(1); }
+  50%{ transform: translate3d(0,-10px,0) scale(1.02); }
+}
+
+.vibeGradientB{
+  position: absolute;
+  inset: -12%;
+  background:
+    radial-gradient(700px 520px at 30% 82%,
+      rgba(255, 215, 80, .14),
+      rgba(255,255,255,0) 60%),
+    radial-gradient(520px 520px at 74% 30%,
+      rgba(255, 80, 190, .12),
+      rgba(255,255,255,0) 60%);
+  filter: blur(22px);
+  opacity: .9;
+  animation: vibeFloatB 14s ease-in-out infinite;
+}
+
+@keyframes vibeFloatB{
+  0%,100%{ transform: translate3d(0,0,0) scale(1); }
+  50%{ transform: translate3d(0,12px,0) scale(1.03); }
+}
+
+.vibeGrid{
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(255,255,255,.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: .20;
+  mask-image: radial-gradient(circle at 50% 18%,
+    rgba(0,0,0,.95),
+    rgba(0,0,0,.10) 70%,
+    transparent 85%);
+}
+
+.vibeNoise{
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  opacity: .18;
+}
+
+/* 메인 콘텐츠를 배경보다 위로 */
+.page > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* 타이포 톤만 살짝 업그레이드(내용은 동일) */
+.page :global(h1){
+  letter-spacing: -0.05em;
+}
+.page :global(p){
+  color: var(--v-muted);
+  line-height: 1.7;
+}
+
+/* 카드/패널: 글래스 느낌만 */
+.card,
+.heroPanel,
+.partnerCard,
+.trendCard,
+.tableShell{
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(12px);
+}
+
+/* 버튼: 기존 클래스명 유지하면서 vibe 톤 */
+.btnPrimary{
+  background: rgba(255,215,80,.95);
+  color: #101015;
+  box-shadow: 0 14px 34px rgba(255,215,80,.18);
+}
+.btnGhost{
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(10px);
+}
+
+/* 헤더도 약간만 글래스로 */
+.header{
+  background: rgba(0,0,0,.18);
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  backdrop-filter: blur(12px);
+}

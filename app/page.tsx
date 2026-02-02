@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from './supabase';
 import styles from './page.module.css';
 import { SpeedInsights } from "@vercel/speed-insights/next"
+
 
 type Procedure = {
   id: number;
@@ -35,6 +36,7 @@ export default function Home() {
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+  const vibeRef = useRef<HTMLElement | null>(null);
 
   // Auth & Stamps
   const [user, setUser] = useState<any>(null);
@@ -111,6 +113,29 @@ export default function Home() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+  
+  useEffect(() => {
+    const el = vibeRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const onMove = (e: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.setProperty('--mx', String(x));
+        el.style.setProperty('--my', String(y));
+      });
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('pointermove', onMove);
+    };
+  }, []);
 
   // ✅ Drawer 열렸을 때 배경 스크롤 잠금
   useEffect(() => {
@@ -172,7 +197,14 @@ export default function Home() {
   const trendingProcedures = procedures.filter((p) => p.rank <= 5);
 
   return (
-    <main className={styles.page}>
+    <main ref={vibeRef} className={styles.page}>
+      {/* ✅ vibe background (내용 변경 없음) */}
+      <div className={styles.vibeBg} aria-hidden="true">
+        <div className={styles.vibeGradientA} />
+        <div className={styles.vibeGradientB} />
+        <div className={styles.vibeGrid} />
+        <div className={styles.vibeNoise} />
+      </div>
       {/* Header */}
       <header className={styles.header}>
         <div className={`container ${styles.navWrap}`}>
