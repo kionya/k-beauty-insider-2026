@@ -416,6 +416,62 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Loyalty / Stamps */}
+      <section id="loyalty" className={styles.section} data-reveal>
+        <div className="container">
+          <div className={styles.sectionHead} data-reveal>
+            <h2 className={styles.h2}>Loyalty Stamps</h2>
+            <p className={styles.sub}>Collect 10 stamps to unlock a free procedure.</p>
+          </div>
+
+          <div className={styles.loyaltyCard} data-reveal>
+            {!user && (
+              <div className={styles.lockOverlay}>
+                <div className={styles.lockTitle}>Members Only</div>
+                <div className={styles.lockSub}>Sign in to track your stamps.</div>
+                <button className={styles.btnPrimary} type="button" onClick={() => setIsLoginModalOpen(true)}>
+                  Sign in
+                </button>
+              </div>
+            )}
+
+            <div className={styles.loyaltyTop}>
+              <div>
+                <div className={styles.cardTitle}>My Stamps</div>
+                <div className={styles.cardDesc}>Earn stamps when your reservation is completed.</div>
+              </div>
+              <div className={styles.stampCount}>
+                {currentStamps} / {MAX_STAMPS}
+              </div>
+            </div>
+
+            <div className={styles.stampsGrid}>
+              {Array.from({ length: MAX_STAMPS }).map((_, idx) => {
+                const on = idx < currentStamps;
+                return (
+                  <div key={idx} className={`${styles.stampCell} ${on ? styles.stampOn : ''}`}>
+                    {on ? <i className="fa-solid fa-check" /> : idx + 1}
+                  </div>
+                );
+              })}
+            </div>
+
+            {currentStamps >= MAX_STAMPS ? (
+              <div className={styles.rewardRow}>
+                <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('prices')}>
+                  Select Free Procedure
+                </button>
+              </div>
+            ) : (
+              <div className={styles.rewardHint}>
+                {MAX_STAMPS - currentStamps} more visits needed for a free reward.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+
       {/* Why choose */}
       <section id="why" className={styles.section} data-reveal>
         <div className="container">
@@ -644,61 +700,6 @@ export default function Home() {
                 Next
               </button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Loyalty / Stamps */}
-      <section id="loyalty" className={styles.section} data-reveal>
-        <div className="container">
-          <div className={styles.sectionHead} data-reveal>
-            <h2 className={styles.h2}>Loyalty Stamps</h2>
-            <p className={styles.sub}>Collect 10 stamps to unlock a free procedure.</p>
-          </div>
-
-          <div className={styles.loyaltyCard} data-reveal>
-            {!user && (
-              <div className={styles.lockOverlay}>
-                <div className={styles.lockTitle}>Members Only</div>
-                <div className={styles.lockSub}>Sign in to track your stamps.</div>
-                <button className={styles.btnPrimary} type="button" onClick={() => setIsLoginModalOpen(true)}>
-                  Sign in
-                </button>
-              </div>
-            )}
-
-            <div className={styles.loyaltyTop}>
-              <div>
-                <div className={styles.cardTitle}>My Stamps</div>
-                <div className={styles.cardDesc}>Earn stamps when your reservation is completed.</div>
-              </div>
-              <div className={styles.stampCount}>
-                {currentStamps} / {MAX_STAMPS}
-              </div>
-            </div>
-
-            <div className={styles.stampsGrid}>
-              {Array.from({ length: MAX_STAMPS }).map((_, idx) => {
-                const on = idx < currentStamps;
-                return (
-                  <div key={idx} className={`${styles.stampCell} ${on ? styles.stampOn : ''}`}>
-                    {on ? <i className="fa-solid fa-check" /> : idx + 1}
-                  </div>
-                );
-              })}
-            </div>
-
-            {currentStamps >= MAX_STAMPS ? (
-              <div className={styles.rewardRow}>
-                <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('prices')}>
-                  Select Free Procedure
-                </button>
-              </div>
-            ) : (
-              <div className={styles.rewardHint}>
-                {MAX_STAMPS - currentStamps} more visits needed for a free reward.
-              </div>
-            )}
           </div>
         </div>
       </section>
