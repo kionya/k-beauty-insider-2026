@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -421,7 +421,7 @@ export default function Home() {
       </section>
 
       {/* Featured clinics */}
-      <section id="featured" ref={(el) => (featuredRef.current = el)} className={styles.sectionAlt} data-reveal>
+      <section id="featured" ref={(el) => {featuredRef.current = el;}} className={styles.sectionAlt} data-reveal>
         <div className="container">
           <div className={styles.sectionHeadRow} data-reveal>
             <div>
@@ -485,7 +485,7 @@ export default function Home() {
       </section>
 
       {/* Prices (kept for data integrity + mobile cards) */}
-      <section id="prices" ref={(el) => (pricesRef.current = el)} className={styles.sectionAlt} data-reveal>
+      <section id="prices" ref={(el) => {pricesRef.current = el;}} className={styles.sectionAlt} data-reveal>
         <div className="container">
           <div className={styles.sectionHeadRow} data-reveal>
             <div>
