@@ -1221,15 +1221,11 @@
 .revealOn{} /* JS가 붙이는 클래스 (빈 셀렉터로 모듈 export 확보) */
 
 [data-reveal]{
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);
-  will-change: opacity, transform;
+  opacity: 0;   transform: translateY(18px);   transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);   will-change: opacity, transform;
 }
 
 :global(.revealOn){
-  opacity: 1;
-  transform: translateY(0);
+  opacity: 1;   transform: translateY(0);
 }
 
 /* 모션 최소화 설정 존중 */

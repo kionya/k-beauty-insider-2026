@@ -4,8 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from './supabase';
 import styles from './page.module.css';
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { useState, useEffect, useRef } from 'react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 
 type Procedure = {
@@ -674,7 +673,7 @@ export default function Home() {
           <div>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</div>
         </div>
       </footer>
-
+      
       {isDrawerOpen && (
         <div
           className={styles.drawerOverlay}
@@ -796,3 +795,4 @@ export default function Home() {
     </main>
   );
 }
+<SpeedInsights />
