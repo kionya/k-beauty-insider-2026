@@ -1241,7 +1241,6 @@
   .stampsGrid { grid-template-columns: repeat(5, 1fr); }
 
   /* Price List switch */
-  .table { display: none; }
   .mobileCards { display: block; }
 
   .rangeWrap input[type="range"] { width: 120px; }
