@@ -137,7 +137,7 @@ export default function ProcedureDetail() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(json?.error ?? 'Error submitting request. Please try again.');
+        alert(json?.error ?? `Request failed (${res.status})`);
         return;
       }
 
