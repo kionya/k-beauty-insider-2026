@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 import { supabase } from './supabase';
 import styles from './page.module.css';
-import { SpeedInsights } from "@vercel/speed-insights/next"
-
 
 type Procedure = {
   id: number;
@@ -36,7 +36,11 @@ export default function Home() {
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // vibe mouse tracking target
   const vibeRef = useRef<HTMLElement | null>(null);
+
+  // header scrolled
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Auth & Stamps
@@ -51,7 +55,7 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // ✅ Drawer (mobile nav)
+  // Drawer (mobile nav)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const fetchMyStamps = async (userId: string) => {
@@ -63,13 +67,10 @@ export default function Home() {
     if (!error && count !== null) setCurrentStamps(count);
   };
 
+  // init load
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase
-        .from('procedures')
-        .select('*')
-        .order('rank', { ascending: true });
-
+      const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
       if (data) setProcedures(data);
 
       const {
@@ -95,6 +96,7 @@ export default function Home() {
     };
   }, []);
 
+  // header scroll state
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 6);
     onScroll();
@@ -102,11 +104,11 @@ export default function Home() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // reveal (intersection observer)
   useEffect(() => {
     const els = Array.from(document.querySelectorAll('[data-reveal]')) as HTMLElement[];
     if (!els.length) return;
 
-    // 모션 최소화 설정 존중
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     if (reduced) {
       els.forEach((el) => el.classList.add(styles.revealOn));
@@ -127,86 +129,90 @@ export default function Home() {
 
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
+  }, [styles.revealOn]);
+
+  // tilt cards
+  useEffect(() => {
+    const cards = Array.from(document.querySelectorAll('[data-tilt]')) as HTMLElement[];
+    if (!cards.length) return;
+
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduced) return;
+
+    const onMove = (e: PointerEvent) => {
+      const el = e.currentTarget as HTMLElement;
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width;
+      const y = (e.clientY - r.top) / r.height;
+      const tx = (x - 0.5) * 10;
+      const ty = (y - 0.5) * 10;
+      el.style.setProperty('--tx', tx.toFixed(2));
+      el.style.setProperty('--ty', ty.toFixed(2));
+    };
+
+    const onLeave = (e: PointerEvent) => {
+      const el = e.currentTarget as HTMLElement;
+      el.style.setProperty('--tx', '0');
+      el.style.setProperty('--ty', '0');
+    };
+
+    cards.forEach((el) => {
+      el.style.setProperty('--tx', '0');
+      el.style.setProperty('--ty', '0');
+      el.addEventListener('pointermove', onMove as any, { passive: true });
+      el.addEventListener('pointerleave', onLeave as any, { passive: true });
+    });
+
+    return () => {
+      cards.forEach((el) => {
+        el.removeEventListener('pointermove', onMove as any);
+        el.removeEventListener('pointerleave', onLeave as any);
+      });
+    };
   }, []);
 
+  // trending slider drag
   useEffect(() => {
-  const cards = Array.from(document.querySelectorAll('[data-tilt]')) as HTMLElement[];
-  if (!cards.length) return;
+    const track = document.getElementById('trendSlider') as HTMLElement | null;
+    if (!track) return;
 
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-  if (reduced) return;
+    let isDown = false;
+    let startX = 0;
+    let startScrollLeft = 0;
 
-  const onMove = (e: PointerEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;  // 0..1
-    const y = (e.clientY - r.top) / r.height;  // 0..1
-    const tx = (x - 0.5) * 10; // -5..5
-    const ty = (y - 0.5) * 10; // -5..5
-    el.style.setProperty('--tx', tx.toFixed(2));
-    el.style.setProperty('--ty', ty.toFixed(2));
-  };
+    const onDown = (e: PointerEvent) => {
+      isDown = true;
+      track.classList.add(styles.dragging);
+      track.setPointerCapture(e.pointerId);
+      startX = e.clientX;
+      startScrollLeft = track.scrollLeft;
+    };
 
-  const onLeave = (e: PointerEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    el.style.setProperty('--tx', '0');
-    el.style.setProperty('--ty', '0');
-  };
+    const onMove = (e: PointerEvent) => {
+      if (!isDown) return;
+      const dx = e.clientX - startX;
+      track.scrollLeft = startScrollLeft - dx;
+    };
 
-  cards.forEach((el) => {
-    el.style.setProperty('--tx', '0');
-    el.style.setProperty('--ty', '0');
-    el.addEventListener('pointermove', onMove as any, { passive: true });
-    el.addEventListener('pointerleave', onLeave as any, { passive: true });
-  });
+    const onUp = () => {
+      isDown = false;
+      track.classList.remove(styles.dragging);
+    };
 
-  return () => {
-    cards.forEach((el) => {
-      el.removeEventListener('pointermove', onMove as any);
-      el.removeEventListener('pointerleave', onLeave as any);
-    });
-  };
-}, []);
+    track.addEventListener('pointerdown', onDown);
+    track.addEventListener('pointermove', onMove);
+    track.addEventListener('pointerup', onUp);
+    track.addEventListener('pointercancel', onUp);
 
-  useEffect(() => {
-  const track = document.getElementById('trendSlider') as HTMLElement | null;
-  if (!track) return;
+    return () => {
+      track.removeEventListener('pointerdown', onDown);
+      track.removeEventListener('pointermove', onMove);
+      track.removeEventListener('pointerup', onUp);
+      track.removeEventListener('pointercancel', onUp);
+    };
+  }, [styles.dragging]);
 
-  let isDown = false;
-  let startX = 0;
-  let startScrollLeft = 0;
-
-  const onDown = (e: PointerEvent) => {
-    isDown = true;
-    track.classList.add(styles.dragging);
-    track.setPointerCapture(e.pointerId);
-    startX = e.clientX;
-    startScrollLeft = track.scrollLeft;
-  };
-
-  const onMove = (e: PointerEvent) => {
-    if (!isDown) return;
-    const dx = e.clientX - startX;
-    track.scrollLeft = startScrollLeft - dx;
-  };
-
-  const onUp = () => {
-    isDown = false;
-    track.classList.remove(styles.dragging);
-  };
-
-  track.addEventListener('pointerdown', onDown);
-  track.addEventListener('pointermove', onMove);
-  track.addEventListener('pointerup', onUp);
-  track.addEventListener('pointercancel', onUp);
-  return () => {
-    track.removeEventListener('pointerdown', onDown);
-    track.removeEventListener('pointermove', onMove);
-    track.removeEventListener('pointerup', onUp);
-    track.removeEventListener('pointercancel', onUp);
-  };
-}, []);
-
+  // exchange rate
   useEffect(() => {
     const loadRate = async () => {
       try {
@@ -214,11 +220,14 @@ export default function Home() {
         const json = await res.json();
         const rate = Number(json?.rate);
         if (Number.isFinite(rate) && rate > 0) setExchangeRate(rate);
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
     loadRate();
   }, []);
 
+  // escape closes drawer
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsDrawerOpen(false);
@@ -226,7 +235,8 @@ export default function Home() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
-  
+
+  // vibe mouse variables
   useEffect(() => {
     const el = vibeRef.current;
     if (!el) return;
@@ -250,7 +260,7 @@ export default function Home() {
     };
   }, []);
 
-  // ✅ Drawer 열렸을 때 배경 스크롤 잠금
+  // drawer open => lock scroll
   useEffect(() => {
     document.body.style.overflow = isDrawerOpen ? 'hidden' : '';
     return () => {
@@ -259,14 +269,17 @@ export default function Home() {
   }, [isDrawerOpen]);
 
   const handleAuth = async () => {
-    if (!email || !password) return alert('Enter email/password');
+    if (!email || !password) {
+      alert('Enter email/password');
+      return;
+    }
 
     if (authMode === 'SIGNUP') {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -287,9 +300,7 @@ export default function Home() {
   };
 
   const getPrice = (krwPrice: number) =>
-    currency === 'KRW'
-      ? `₩${krwPrice.toLocaleString()}`
-      : `$${Math.round(krwPrice / exchangeRate)}`;
+    currency === 'KRW' ? `₩${krwPrice.toLocaleString()}` : `$${Math.round(krwPrice / exchangeRate)}`;
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -311,13 +322,14 @@ export default function Home() {
 
   return (
     <main ref={vibeRef} className={styles.page}>
-      {/* ✅ vibe background (내용 변경 없음) */}
+      {/* vibe background */}
       <div className={styles.vibeBg} aria-hidden="true">
         <div className={styles.vibeGradientA} />
         <div className={styles.vibeGradientB} />
         <div className={styles.vibeGrid} />
         <div className={styles.vibeNoise} />
       </div>
+
       {/* Header */}
       <header className={`${styles.header} ${isScrolled ? styles.headerScrolled : ''}`}>
         <div className={`container ${styles.navWrap}`}>
@@ -330,16 +342,21 @@ export default function Home() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <nav className={styles.nav}>
-              {/* 기존 데스크탑 메뉴 그대로 */}
               {user && <a href="#benefits">Loyalty</a>}
               <a href="#ranking">Trends</a>
               <a href="#prices">Prices</a>
-              <a href="#partners" className={styles.navCta}>Free Pass</a>
+              <a href="#partners" className={styles.navCta}>
+                Free Pass
+              </a>
 
               {user ? (
-                <button className={styles.btnGhost} onClick={handleLogout} type="button">Logout</button>
+                <button className={styles.btnGhost} onClick={handleLogout} type="button">
+                  Logout
+                </button>
               ) : (
-                <button className={styles.btnPrimary} onClick={() => setIsLoginModalOpen(true)} type="button">Login</button>
+                <button className={styles.btnPrimary} onClick={() => setIsLoginModalOpen(true)} type="button">
+                  Login
+                </button>
               )}
 
               <Link href="/admin" className={styles.iconLink} aria-label="Admin">
@@ -347,7 +364,6 @@ export default function Home() {
               </Link>
             </nav>
 
-            {/* ✅ 모바일 햄버거 버튼 */}
             <button
               className={styles.mobileNavBtn}
               type="button"
@@ -395,6 +411,7 @@ export default function Home() {
                   <p className={styles.metricText}>Top procedures highlighted from Supabase ranking.</p>
                 </div>
               </div>
+
               <div className={styles.metricRow}>
                 <div className={styles.metricIcon}>
                   <i className="fa-solid fa-coins"></i>
@@ -404,6 +421,7 @@ export default function Home() {
                   <p className={styles.metricText}>KRW / USD toggle (exchange from ENV later).</p>
                 </div>
               </div>
+
               <div className={styles.metricRow}>
                 <div className={styles.metricIcon}>
                   <i className="fa-solid fa-stamp"></i>
@@ -673,13 +691,10 @@ export default function Home() {
           <div>&copy; 2026 K-Beauty Insider. Gangnam, Seoul.</div>
         </div>
       </footer>
-      
+
+      {/* Drawer */}
       {isDrawerOpen && (
-        <div
-          className={styles.drawerOverlay}
-          role="presentation"
-          onClick={() => setIsDrawerOpen(false)}
-        >
+        <div className={styles.drawerOverlay} role="presentation" onClick={() => setIsDrawerOpen(false)}>
           <div
             className={styles.drawer}
             role="dialog"
@@ -695,7 +710,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <button className={styles.mobileNavBtn} type="button" aria-label="Close menu" onClick={() => setIsDrawerOpen(false)}>
+              <button
+                className={styles.mobileNavBtn}
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setIsDrawerOpen(false)}
+              >
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -792,7 +812,9 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ✅ 반드시 컴포넌트 내부에서 렌더링 */}
+      <SpeedInsights />
     </main>
   );
 }
-<SpeedInsights />
