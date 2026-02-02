@@ -22,11 +22,9 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
   const [proc, setProc] = useState<Procedure | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // price toggle + exchange rate
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
 
-  // booking modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,7 +34,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
     messenger: 'KakaoTalk',
   });
 
-  // fetch procedure
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -51,7 +48,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
     fetchData();
   }, [id]);
 
-  // exchange rate from server route (API only)
   useEffect(() => {
     const loadRate = async () => {
       try {
@@ -73,19 +69,17 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
 
   const clinicRows = useMemo(() => {
     const arr = proc?.clinics ?? [];
-    return arr.map((clinicStr) => {
-      const [name, price] = String(clinicStr).split(':');
-      const krw = price ? Number.parseInt(price, 10) : null;
-      return {
-        name: (name ?? '').trim(),
-        krw,
-      };
-    });
+    return arr
+      .map((clinicStr) => {
+        const [name, price] = String(clinicStr).split(':');
+        const krw = price ? Number.parseInt(price, 10) : null;
+        return { name: (name ?? '').trim(), krw };
+      })
+      .filter((x) => x.name);
   }, [proc]);
 
   const submitReservation = async (e: FormEvent) => {
     e.preventDefault();
-
     if (!proc) return;
 
     const customer_name = formData.name.trim();
@@ -99,7 +93,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
 
     setSubmitting(true);
     try {
-      // optional bearer token (for logged-in user context)
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -114,7 +107,7 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
-          user_id: userId, // 로그인 시만 세팅, 아니면 null
+          user_id: userId,
           customer_name,
           contact_info,
           messenger_type,
@@ -179,7 +172,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
 
   return (
     <main className={styles.page}>
-      {/* Header */}
       <header className={styles.header}>
         <div className={`container ${styles.navWrap}`}>
           <Link href="/" className={styles.brand}>
@@ -207,7 +199,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
         </div>
       </header>
 
-      {/* Hero */}
       <section className={styles.hero}>
         <div className={`container ${styles.heroGrid}`}>
           <div className={styles.heroLeft}>
@@ -236,10 +227,8 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
         </div>
       </section>
 
-      {/* Content */}
       <section className={styles.section}>
         <div className={`container ${styles.contentGrid}`}>
-          {/* Price card */}
           <article className={styles.card}>
             <div className={styles.cardHead}>
               <div>
@@ -269,7 +258,107 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
             <div className={styles.note}>₩{Math.round(exchangeRate).toLocaleString()} / $1</div>
           </article>
 
-          {/* Clinic list */}
           <article className={styles.card}>
             <div className={styles.cardTitle}>Partner Clinics Pricing</div>
-            <div className
+            <div className={styles.cardSub}>Click a row to request consultation.</div>
+
+            <div className={styles.clinicList}>
+              {clinicRows.length ? (
+                clinicRows.map((c) => (
+                  <button
+                    key={`${c.name}-${c.krw ?? 'na'}`}
+                    className={styles.clinicRow}
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                  >
+                    <div className={styles.clinicLeft}>
+                      <i className="fa-solid fa-hospital" aria-hidden="true" />
+                      <span>{c.name}</span>
+                    </div>
+                    <div className={styles.clinicRight}>{c.krw ? formatPrice(c.krw) : 'Contact for Price'}</div>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.empty}>No clinic pricing available.</div>
+              )}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div className={styles.fabWrap}>
+        <button className={styles.fab} type="button" onClick={() => setIsModalOpen(true)}>
+          Request Free Consultation
+        </button>
+      </div>
+
+      {isModalOpen && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+          <div className={styles.modal}>
+            <button className={styles.modalClose} onClick={() => setIsModalOpen(false)} type="button">
+              ✕
+            </button>
+
+            <div className={styles.modalTitle}>Request Consultation</div>
+            <div className={styles.modalSub}>
+              Leave your contact info. We will reach out via your preferred messenger.
+            </div>
+
+            <form onSubmit={submitReservation} className={styles.modalForm}>
+              <div>
+                <label className={styles.modalLabel}>Full Name</label>
+                <input
+                  className={styles.modalInput}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Your Name"
+                />
+              </div>
+
+              <div>
+                <label className={styles.modalLabel}>Messenger App</label>
+                <select
+                  className={styles.modalInput}
+                  value={formData.messenger}
+                  onChange={(e) => setFormData({ ...formData, messenger: e.target.value })}
+                >
+                  <option value="KakaoTalk">KakaoTalk ID</option>
+                  <option value="WhatsApp">WhatsApp Number</option>
+                  <option value="Line">LINE ID</option>
+                  <option value="WeChat">WeChat ID</option>
+                  <option value="Phone">Phone Number (SMS)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={styles.modalLabel}>ID / Number</label>
+                <input
+                  className={styles.modalInput}
+                  value={formData.contact}
+                  onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                  placeholder="Enter your ID or Number"
+                />
+              </div>
+
+              <button className={styles.modalSubmit} type="submit" disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <footer className={styles.footer}>
+        <div className={`container ${styles.footerInner}`}>
+          <div className={styles.footerBrand}>
+            <span className={styles.brandIconSmall} aria-hidden="true">
+              <i className="fa-solid fa-crown" />
+            </span>
+            K-Beauty Insider
+          </div>
+          <div className={styles.footerText}>© 2026 K-Beauty Insider. All rights reserved.</div>
+        </div>
+      </footer>
+    </main>
+  );
+}
