@@ -138,22 +138,35 @@ export default function Home() {
     setRevealReady(true);
   }, []);
 
-  // reveal observer
+  // reveal observer (JS 실패해도 화면 보이게 안전 처리)
   useEffect(() => {
     const els = Array.from(document.querySelectorAll('[data-reveal]')) as HTMLElement[];
     if (!els.length) return;
 
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    // reduced motion이면 애니메이션 없이 즉시 표시
     if (reduced) {
       els.forEach((el) => el.classList.add(styles.revealOn));
       return;
     }
 
+    // IntersectionObserver 미지원이면 즉시 표시(= blank page 방지)
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      els.forEach((el) => el.classList.add(styles.revealOn));
+      return;
+    }
+
+    // 관찰 시작 대상에만 pending(숨김) 부여
+    els.forEach((el) => el.classList.add(styles.revealPending));
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const ent of entries) {
           if (ent.isIntersecting) {
-            (ent.target as HTMLElement).classList.add(styles.revealOn);
+            const target = ent.target as HTMLElement;
+            target.classList.remove(styles.revealPending);
+            target.classList.add(styles.revealOn);
             io.unobserve(ent.target);
           }
         }
@@ -163,7 +176,7 @@ export default function Home() {
 
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [styles.revealOn]);
+  }, [styles.revealOn, styles.revealPending]);
 
   // exchange rate (front constant 금지, API only)
   useEffect(() => {
