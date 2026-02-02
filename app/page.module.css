@@ -1217,3 +1217,66 @@
   border-bottom: 1px solid rgba(255,255,255,.10);
   backdrop-filter: blur(12px);
 }
+/* ===== Scroll reveal ===== */
+.revealOn{} /* JS가 붙이는 클래스 (빈 셀렉터로 모듈 export 확보) */
+
+[data-reveal]{
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);
+  will-change: opacity, transform;
+}
+
+:global(.revealOn){
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 모션 최소화 설정 존중 */
+@media (prefers-reduced-motion: reduce){
+  [data-reveal]{ opacity:1; transform:none; transition:none; }
+}
+
+/* ===== Tilt ===== */
+.tilt{
+  transform: perspective(900px)
+    rotateX(calc(var(--ty, 0) * -1deg))
+    rotateY(calc(var(--tx, 0) * 1deg))
+    translateZ(0);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+  will-change: transform;
+}
+.tilt:hover{
+  box-shadow: 0 22px 70px rgba(0,0,0,.45);
+}
+
+/* ===== Header scrolled ===== */
+.headerScrolled{
+  transform: translateY(-2px);
+  background: rgba(0,0,0,.26);
+  border-bottom: 1px solid rgba(255,255,255,.14);
+}
+
+/* ===== Trending slider drag ===== */
+/* trendSlider(id)는 sliderTrack에 이미 붙어 있음 */
+.sliderTrack{
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  user-select: none;
+  gap: 14px; /* 기존 gap 없으면 */
+}
+.sliderTrack::-webkit-scrollbar{ height: 8px; }
+.sliderTrack::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.16);
+  border-radius: 999px;
+}
+.dragging{
+  cursor: grabbing;
+}
+
+/* 카드가 스냅되게 (trendCard에 적용) */
+.trendCard{
+  scroll-snap-align: start;
+}

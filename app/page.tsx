@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from './supabase';
 import styles from './page.module.css';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { useState, useEffect, useRef } from 'react';
 
 
 type Procedure = {
@@ -37,6 +38,7 @@ export default function Home() {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
   const vibeRef = useRef<HTMLElement | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   // Auth & Stamps
   const [user, setUser] = useState<any>(null);
@@ -93,6 +95,118 @@ export default function Home() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll('[data-reveal]')) as HTMLElement[];
+    if (!els.length) return;
+
+    // 모션 최소화 설정 존중
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduced) {
+      els.forEach((el) => el.classList.add(styles.revealOn));
+      return;
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const ent of entries) {
+          if (ent.isIntersecting) {
+            (ent.target as HTMLElement).classList.add(styles.revealOn);
+            io.unobserve(ent.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
+    );
+
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+  const cards = Array.from(document.querySelectorAll('[data-tilt]')) as HTMLElement[];
+  if (!cards.length) return;
+
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  if (reduced) return;
+
+  const onMove = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;  // 0..1
+    const y = (e.clientY - r.top) / r.height;  // 0..1
+    const tx = (x - 0.5) * 10; // -5..5
+    const ty = (y - 0.5) * 10; // -5..5
+    el.style.setProperty('--tx', tx.toFixed(2));
+    el.style.setProperty('--ty', ty.toFixed(2));
+  };
+
+  const onLeave = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    el.style.setProperty('--tx', '0');
+    el.style.setProperty('--ty', '0');
+  };
+
+  cards.forEach((el) => {
+    el.style.setProperty('--tx', '0');
+    el.style.setProperty('--ty', '0');
+    el.addEventListener('pointermove', onMove as any, { passive: true });
+    el.addEventListener('pointerleave', onLeave as any, { passive: true });
+  });
+
+  return () => {
+    cards.forEach((el) => {
+      el.removeEventListener('pointermove', onMove as any);
+      el.removeEventListener('pointerleave', onLeave as any);
+    });
+  };
+}, []);
+
+  useEffect(() => {
+  const track = document.getElementById('trendSlider') as HTMLElement | null;
+  if (!track) return;
+
+  let isDown = false;
+  let startX = 0;
+  let startScrollLeft = 0;
+
+  const onDown = (e: PointerEvent) => {
+    isDown = true;
+    track.classList.add(styles.dragging);
+    track.setPointerCapture(e.pointerId);
+    startX = e.clientX;
+    startScrollLeft = track.scrollLeft;
+  };
+
+  const onMove = (e: PointerEvent) => {
+    if (!isDown) return;
+    const dx = e.clientX - startX;
+    track.scrollLeft = startScrollLeft - dx;
+  };
+
+  const onUp = () => {
+    isDown = false;
+    track.classList.remove(styles.dragging);
+  };
+
+  track.addEventListener('pointerdown', onDown);
+  track.addEventListener('pointermove', onMove);
+  track.addEventListener('pointerup', onUp);
+  track.addEventListener('pointercancel', onUp);
+  return () => {
+    track.removeEventListener('pointerdown', onDown);
+    track.removeEventListener('pointermove', onMove);
+    track.removeEventListener('pointerup', onUp);
+    track.removeEventListener('pointercancel', onUp);
+  };
+}, []);
 
   useEffect(() => {
     const loadRate = async () => {
@@ -206,7 +320,7 @@ export default function Home() {
         <div className={styles.vibeNoise} />
       </div>
       {/* Header */}
-      <header className={styles.header}>
+      <header className={`${styles.header} ${isScrolled ? styles.headerScrolled : ''}`}>
         <div className={`container ${styles.navWrap}`}>
           <div className={styles.logo}>
             <span className={styles.logoMark} aria-hidden="true" />
@@ -249,7 +363,7 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className={styles.hero}>
+      <section className={styles.hero} data-reveal>
         <div className="container">
           <div className={styles.heroGrid}>
             <div>
@@ -272,7 +386,7 @@ export default function Home() {
               </div>
             </div>
 
-            <aside className={styles.heroPanel}>
+            <aside className={`${styles.heroPanel} ${styles.tilt}`} data-tilt data-reveal>
               <div className={styles.metricRow}>
                 <div className={styles.metricIcon}>
                   <i className="fa-solid fa-chart-line"></i>
@@ -364,7 +478,7 @@ export default function Home() {
       </section>
 
       {/* Trending */}
-      <section id="ranking" className={styles.section}>
+      <section id="ranking" className={styles.section} data-reveal>
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
@@ -377,7 +491,7 @@ export default function Home() {
             <div className={styles.sliderTrack} id="trendSlider">
               {trendingProcedures.map((proc) => (
                 <Link href={`/procedures/${proc.id}`} key={proc.id}>
-                  <article className={styles.trendCard}>
+                  <article className={`${styles.trendCard} ${styles.tilt}`} data-tilt data-reveal>
                     <div>
                       <div className={styles.trendTop}>
                         <div className={styles.rankTag}>Rank 0{proc.rank}</div>
@@ -529,7 +643,7 @@ export default function Home() {
 
           <div className={styles.partnerGrid}>
             {PARTNERS.map((p, idx) => (
-              <div key={idx} className={styles.partnerCard}>
+              <div key={idx} className={`${styles.partnerCard} ${styles.tilt}`} data-tilt data-reveal>
                 <div className={styles.partnerTag}>
                   <span className={`${styles.pill} ${styles.pillBrand}`}>FREE PASS</span>
                 </div>
