@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../supabase';
 import styles from './page.module.css';
@@ -17,7 +18,9 @@ type Procedure = {
 };
 
 export default function ProcedureDetail({ params }: { params: { id: string } }) {
-  const id = params.id;
+  const params = useParams();
+  const rawId = (params as any)?.id;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId; // string | undefined
 
   const [proc, setProc] = useState<Procedure | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,15 +39,32 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+
+      const pid = Number(id);
+      if (!Number.isFinite(pid)) {
+        setProc(null);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
 
-      const { data, error } = await supabase.from('procedures').select('*').eq('id', id).single();
+      const { data, error } = await supabase
+        .from('procedures')
+        .select('*')
+        .eq('id', pid)
+        .single();
+
       if (!error && data) setProc(data as any);
       else setProc(null);
 
       setLoading(false);
     };
+
     fetchData();
   }, [id]);
 
