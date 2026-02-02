@@ -36,6 +36,9 @@ export default function Home() {
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+  // ✅ trendSlider: 드래그 중 클릭 방지용
+  const sliderDraggedRef = useRef(false);
+  const blockClickUntilRef = useRef(0);
 
   // vibe mouse tracking target
   const vibeRef = useRef<HTMLElement | null>(null);
@@ -180,37 +183,55 @@ export default function Home() {
     let startX = 0;
     let startScrollLeft = 0;
 
+    const DRAG_THRESHOLD = 6; // px
+
     const onDown = (e: PointerEvent) => {
       isDown = true;
+      sliderDraggedRef.current = false;
+
       track.classList.add(styles.dragging);
       track.setPointerCapture(e.pointerId);
+
       startX = e.clientX;
       startScrollLeft = track.scrollLeft;
     };
 
     const onMove = (e: PointerEvent) => {
       if (!isDown) return;
+
       const dx = e.clientX - startX;
+
+      if (Math.abs(dx) > DRAG_THRESHOLD) {
+        sliderDraggedRef.current = true;
+      }
+
       track.scrollLeft = startScrollLeft - dx;
     };
 
-    const onUp = () => {
+    const endDrag = () => {
+      if (!isDown) return;
       isDown = false;
       track.classList.remove(styles.dragging);
+
+      // 드래그가 있었다면 잠깐 클릭 차단
+      if (sliderDraggedRef.current) {
+        blockClickUntilRef.current = Date.now() + 250;
+      }
     };
 
-    track.addEventListener('pointerdown', onDown);
-    track.addEventListener('pointermove', onMove);
-    track.addEventListener('pointerup', onUp);
-    track.addEventListener('pointercancel', onUp);
+      track.addEventListener('pointerdown', onDown);
+      track.addEventListener('pointermove', onMove);
+      track.addEventListener('pointerup', endDrag);
+      track.addEventListener('pointercancel', endDrag);
 
     return () => {
       track.removeEventListener('pointerdown', onDown);
       track.removeEventListener('pointermove', onMove);
-      track.removeEventListener('pointerup', onUp);
-      track.removeEventListener('pointercancel', onUp);
+      track.removeEventListener('pointerup', endDrag);
+      track.removeEventListener('pointercancel', endDrag);
     };
   }, [styles.dragging]);
+
 
   // exchange rate
   useEffect(() => {
@@ -437,7 +458,7 @@ export default function Home() {
       </section>
 
       {/* Loyalty */}
-      <section id="benefits" className={`${styles.section} ${styles.sectionAlt}`}>
+      <section id="benefits" className={`${styles.section} ${styles.sectionAlt}`} data-reveal>
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
@@ -446,7 +467,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className={`${styles.card} ${styles.lockWrap}`}>
+          <div className={`${styles.card} ${styles.lockWrap}`} data-reveal>
             {!user && (
               <div className={styles.lockOverlay}>
                 <div className={styles.lockTitle}>Members Only Benefit</div>
@@ -505,7 +526,16 @@ export default function Home() {
           </div>
 
           <div className={styles.sliderWrap}>
-            <div className={styles.sliderTrack} id="trendSlider">
+            <div className={styles.sliderTrack} 
+              className={styles.sliderTrack}
+              id="trendSlider"
+              onClickCapture={(e) => {
+                if (Date.now() < blockClickUntilRef.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+            >
               {trendingProcedures.map((proc) => (
                 <Link href={`/procedures/${proc.id}`} key={proc.id}>
                   <article className={`${styles.trendCard} ${styles.tilt}`} data-tilt data-reveal>
@@ -531,7 +561,7 @@ export default function Home() {
       </section>
 
       {/* Prices */}
-      <section id="prices" className={styles.section}>
+      <section id="prices" className={styles.section} data-reveal>
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
@@ -557,7 +587,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className={styles.tableShell}>
+          <div className={styles.tableShell} data-reveal>
             <table className={styles.table}>
               <thead className={styles.thead}>
                 <tr>
@@ -645,7 +675,7 @@ export default function Home() {
       </section>
 
       {/* Partners */}
-      <section id="partners" className={styles.section}>
+      <section id="partners" className={styles.section} data-reveal>
         <div className="container">
           <div className={styles.sectionHeader}>
             <div>
@@ -660,7 +690,7 @@ export default function Home() {
 
           <div className={styles.partnerGrid}>
             {PARTNERS.map((p, idx) => (
-              <div key={idx} className={`${styles.partnerCard} ${styles.tilt}`} data-tilt data-reveal>
+                <div key={idx} className={`${styles.partnerCard} ${styles.tilt}`} data-tilt data-reveal>
                 <div className={styles.partnerTag}>
                   <span className={`${styles.pill} ${styles.pillBrand}`}>FREE PASS</span>
                 </div>
