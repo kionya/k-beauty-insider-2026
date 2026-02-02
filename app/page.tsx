@@ -77,6 +77,19 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Loyalty / Stamps
+  const MAX_STAMPS = 10;
+  const [currentStamps, setCurrentStamps] = useState(0);
+
+  const fetchMyStamps = async (userId: string) => {
+    const { count, error } = await supabase
+      .from('stamps')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (!error && count !== null) setCurrentStamps(count);
+  };
+
   // Exchange / Currency
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
@@ -119,6 +132,8 @@ export default function Home() {
       } = await supabase.auth.getSession();
 
       setUser(session?.user || null);
+      if (session?.user) fetchMyStamps(session.user.id);
+      else setCurrentStamps(0);
       setLoading(false);
     };
 
@@ -126,6 +141,8 @@ export default function Home() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      if (session?.user) fetchMyStamps(session.user.id);
+      else setCurrentStamps(0);
     });
 
     return () => {
@@ -254,7 +271,7 @@ export default function Home() {
   const handleNextPage = () => currentPage < totalPages && setCurrentPage((p) => p + 1);
   const handlePrevPage = () => currentPage > 1 && setCurrentPage((p) => p - 1);
 
-  const onSearch = (e: React.FormEvent) => {
+  const onSearch = (e: FormEvent) => {
     e.preventDefault();
     // 현재는 랜딩 UX용: Featured로 이동 후, 이후 필터 적용/페이지 분리로 확장 가능
     featuredRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -282,6 +299,7 @@ export default function Home() {
 
           <nav className={styles.nav}>
             <a href="#home">Home</a>
+            <a href="#loyalty">Loyalty</a>
             <a href="#featured">Clinics</a>
             <a href="#procedures">Procedures</a>
             <a href="#about">About</a>
@@ -630,6 +648,61 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Loyalty / Stamps */}
+      <section id="loyalty" className={styles.section} data-reveal>
+        <div className="container">
+          <div className={styles.sectionHead} data-reveal>
+            <h2 className={styles.h2}>Loyalty Stamps</h2>
+            <p className={styles.sub}>Collect 10 stamps to unlock a free procedure.</p>
+          </div>
+
+          <div className={styles.loyaltyCard} data-reveal>
+            {!user && (
+              <div className={styles.lockOverlay}>
+                <div className={styles.lockTitle}>Members Only</div>
+                <div className={styles.lockSub}>Sign in to track your stamps.</div>
+                <button className={styles.btnPrimary} type="button" onClick={() => setIsLoginModalOpen(true)}>
+                  Sign in
+                </button>
+              </div>
+            )}
+
+            <div className={styles.loyaltyTop}>
+              <div>
+                <div className={styles.cardTitle}>My Stamps</div>
+                <div className={styles.cardDesc}>Earn stamps when your reservation is completed.</div>
+              </div>
+              <div className={styles.stampCount}>
+                {currentStamps} / {MAX_STAMPS}
+              </div>
+            </div>
+
+            <div className={styles.stampsGrid}>
+              {Array.from({ length: MAX_STAMPS }).map((_, idx) => {
+                const on = idx < currentStamps;
+                return (
+                  <div key={idx} className={`${styles.stampCell} ${on ? styles.stampOn : ''}`}>
+                    {on ? <i className="fa-solid fa-check" /> : idx + 1}
+                  </div>
+                );
+              })}
+            </div>
+
+            {currentStamps >= MAX_STAMPS ? (
+              <div className={styles.rewardRow}>
+                <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('prices')}>
+                  Select Free Procedure
+                </button>
+              </div>
+            ) : (
+              <div className={styles.rewardHint}>
+                {MAX_STAMPS - currentStamps} more visits needed for a free reward.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Testimonials */}
       <section id="about" className={styles.section} data-reveal>
         <div className="container">
@@ -761,6 +834,9 @@ export default function Home() {
             <div className={styles.drawerLinks}>
               <a className={styles.drawerLink} href="#home" onClick={() => setIsDrawerOpen(false)}>
                 Home <i className="fa-solid fa-chevron-right" />
+              </a>
+              <a className={styles.drawerLink} href="#loyalty" onClick={() => setIsDrawerOpen(false)}>
+                Loyalty <i className="fa-solid fa-chevron-right" />
               </a>
               <a className={styles.drawerLink} href="#featured" onClick={() => setIsDrawerOpen(false)}>
                 Clinics <i className="fa-solid fa-chevron-right" />
