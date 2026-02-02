@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-
 import { supabase } from '../../supabase';
 import styles from './page.module.css';
 
@@ -11,48 +10,48 @@ type Procedure = {
   name: string;
   rank: number;
   price_krw: number;
-  description: string | null;
-  category: string | null;
-  clinics: string[] | null;
+  description: string;
+  category: string;
+  clinics: string[];
   is_hot: boolean;
 };
 
 export default function ProcedureDetail({ params }: { params: { id: string } }) {
-  const procId = Number(params.id);
+  const id = params.id;
 
-  const [loading, setLoading] = useState(true);
   const [proc, setProc] = useState<Procedure | null>(null);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // price toggle + exchange rate
   const [currency, setCurrency] = useState<'KRW' | 'USD'>('USD');
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
 
+  // booking modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    contact: '',
+    messenger: 'KakaoTalk',
+  });
+
   // fetch procedure
   useEffect(() => {
-    const run = async () => {
+    const fetchData = async () => {
+      if (!id) return;
       setLoading(true);
-      setErrMsg(null);
 
-      if (!Number.isFinite(procId)) {
-        setErrMsg('Invalid procedure id.');
-        setLoading(false);
-        return;
-      }
+      const { data, error } = await supabase.from('procedures').select('*').eq('id', id).single();
+      if (!error && data) setProc(data as any);
+      else setProc(null);
 
-      const { data, error } = await supabase.from('procedures').select('*').eq('id', procId).single();
-      if (error) {
-        setErrMsg(error.message);
-        setProc(null);
-      } else {
-        setProc(data as any);
-      }
       setLoading(false);
     };
+    fetchData();
+  }, [id]);
 
-    run();
-  }, [procId]);
-
-  // exchange rate (API only)
+  // exchange rate from server route (API only)
   useEffect(() => {
     const loadRate = async () => {
       try {
@@ -67,16 +66,75 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
     loadRate();
   }, []);
 
-  const displayPrice = useMemo(() => {
-    if (!proc) return '-';
-    if (currency === 'KRW') return `₩${proc.price_krw.toLocaleString()}`;
-    return `$${Math.round(proc.price_krw / exchangeRate).toLocaleString()}`;
-  }, [proc, currency, exchangeRate]);
+  const formatPrice = (krw: number) => {
+    if (currency === 'KRW') return `₩${krw.toLocaleString()}`;
+    return `$${Math.round(krw / exchangeRate).toLocaleString()}`;
+  };
 
-  const clinics = useMemo(() => {
+  const clinicRows = useMemo(() => {
     const arr = proc?.clinics ?? [];
-    return (arr || []).map((c) => (c ? c.split(':')[0] : '')).filter(Boolean);
+    return arr.map((clinicStr) => {
+      const [name, price] = String(clinicStr).split(':');
+      const krw = price ? Number.parseInt(price, 10) : null;
+      return {
+        name: (name ?? '').trim(),
+        krw,
+      };
+    });
   }, [proc]);
+
+  const submitReservation = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (!proc) return;
+
+    const customer_name = formData.name.trim();
+    const contact_info = formData.contact.trim();
+    const messenger_type = formData.messenger.trim();
+
+    if (!customer_name || !contact_info || !messenger_type) {
+      alert('Please fill in all fields.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // optional bearer token (for logged-in user context)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const accessToken = session?.access_token ?? '';
+      const userId = session?.user?.id ?? null;
+
+      const res = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          user_id: userId, // 로그인 시만 세팅, 아니면 null
+          customer_name,
+          contact_info,
+          messenger_type,
+          procedure_name: proc.name,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(json?.error ?? 'Error submitting request. Please try again.');
+        return;
+      }
+
+      alert('Request received! We will contact you shortly.');
+      setIsModalOpen(false);
+      setFormData({ name: '', contact: '', messenger: 'KakaoTalk' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -91,41 +149,7 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
             </Link>
           </div>
         </header>
-
         <div className={`container ${styles.center}`}>Loading...</div>
-      </main>
-    );
-  }
-
-  if (errMsg) {
-    return (
-      <main className={styles.page}>
-        <header className={styles.header}>
-          <div className={`container ${styles.navWrap}`}>
-            <Link href="/" className={styles.brand}>
-              <span className={styles.brandIcon} aria-hidden="true">
-                <i className="fa-solid fa-crown" />
-              </span>
-              <span className={styles.brandName}>K-Beauty Insider</span>
-            </Link>
-
-            <div className={styles.navActions}>
-              <Link href="/" className={styles.btnSoftSmall}>
-                Back Home
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        <div className={`container ${styles.center}`}>
-          <div className={styles.errorCard}>
-            <div className={styles.errorTitle}>Failed to load</div>
-            <div className={styles.errorText}>{errMsg}</div>
-            <Link href="/" className={styles.btnPrimary}>
-              Go Home
-            </Link>
-          </div>
-        </div>
       </main>
     );
   }
@@ -141,10 +165,14 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
               </span>
               <span className={styles.brandName}>K-Beauty Insider</span>
             </Link>
+            <div className={styles.navActions}>
+              <Link href="/" className={styles.btnSoftSmall}>
+                Back Home
+              </Link>
+            </div>
           </div>
         </header>
-
-        <div className={`container ${styles.center}`}>Not found.</div>
+        <div className={`container ${styles.center}`}>Procedure not found.</div>
       </main>
     );
   }
@@ -183,18 +211,6 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
       <section className={styles.hero}>
         <div className={`container ${styles.heroGrid}`}>
           <div className={styles.heroLeft}>
-            <div className={styles.breadcrumb}>
-              <Link href="/" className={styles.breadLink}>
-                Home
-              </Link>
-              <span className={styles.breadSep}>/</span>
-              <Link href="/#procedures" className={styles.breadLink}>
-                Procedures
-              </Link>
-              <span className={styles.breadSep}>/</span>
-              <span className={styles.breadNow}>#{proc.id}</span>
-            </div>
-
             <div className={styles.badgeRow}>
               <span className={styles.pill}>Rank {proc.rank}</span>
               {proc.category ? <span className={styles.pillSoft}>{proc.category}</span> : null}
@@ -202,17 +218,15 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
             </div>
 
             <h1 className={styles.h1}>{proc.name}</h1>
-            <p className={styles.lead}>
-              Transparent pricing with verified clinic options. Exchange rate is fetched from server API.
-            </p>
+            <p className={styles.lead}>{proc.description}</p>
 
             <div className={styles.heroActions}>
               <Link href="/#prices" className={styles.btnSoft}>
                 Compare Prices
               </Link>
-              <a href="#booking" className={styles.btnPrimary}>
-                Request Booking
-              </a>
+              <button className={styles.btnPrimary} type="button" onClick={() => setIsModalOpen(true)}>
+                Request Consultation
+              </button>
             </div>
           </div>
 
@@ -229,8 +243,8 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
           <article className={styles.card}>
             <div className={styles.cardHead}>
               <div>
-                <div className={styles.cardTitle}>Estimated Price</div>
-                <div className={styles.cardSub}>Based on official list (KRW) + server exchange rate.</div>
+                <div className={styles.cardTitle}>Gangnam Average</div>
+                <div className={styles.cardSub}>Exchange rate from server API.</div>
               </div>
 
               <div className={styles.toggle}>
@@ -251,80 +265,11 @@ export default function ProcedureDetail({ params }: { params: { id: string } }) 
               </div>
             </div>
 
-            <div className={styles.priceValue}>{displayPrice}</div>
-
-            <div className={styles.priceMetaRow}>
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Exchange Rate</div>
-                <div className={styles.metaValue}>₩{Math.round(exchangeRate).toLocaleString()} / $1</div>
-              </div>
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Procedure ID</div>
-                <div className={styles.metaValue}>#{proc.id}</div>
-              </div>
-            </div>
-
-            <div className={styles.note}>
-              * Prices can vary by clinic, options, and consultation outcomes.
-            </div>
+            <div className={styles.priceValue}>{formatPrice(proc.price_krw)}</div>
+            <div className={styles.note}>₩{Math.round(exchangeRate).toLocaleString()} / $1</div>
           </article>
 
-          {/* Clinics + description */}
+          {/* Clinic list */}
           <article className={styles.card}>
-            <div className={styles.cardTitle}>Top Clinics</div>
-            <div className={styles.cardSub}>Clinic list is derived from procedure metadata.</div>
-
-            {clinics.length ? (
-              <div className={styles.clinicList}>
-                {clinics.map((c) => (
-                  <div key={c} className={styles.clinicItem}>
-                    <i className="fa-solid fa-hospital" aria-hidden="true" />
-                    <span>{c}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.empty}>No clinics listed for this procedure.</div>
-            )}
-
-            <div className={styles.divider} />
-
-            <div className={styles.cardTitle}>Description</div>
-            <p className={styles.desc}>{proc.description || 'No description provided yet.'}</p>
-          </article>
-        </div>
-      </section>
-
-      {/* Booking CTA */}
-      <section id="booking" className={styles.cta}>
-        <div className={`container ${styles.ctaInner}`}>
-          <h2 className={styles.ctaTitle}>Request a Consultation</h2>
-          <p className={styles.ctaSub}>
-            For booking requests, use the main page flow (or connect this to a reservations form).
-          </p>
-          <div className={styles.ctaActions}>
-            <Link href="/#featured" className={styles.btnPrimary}>
-              Explore Clinics
-            </Link>
-            <Link href="/#prices" className={styles.btnSoft}>
-              Back to Price List
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
-        <div className={`container ${styles.footerInner}`}>
-          <div className={styles.footerBrand}>
-            <span className={styles.brandIconSmall} aria-hidden="true">
-              <i className="fa-solid fa-crown" />
-            </span>
-            K-Beauty Insider
-          </div>
-          <div className={styles.footerText}>© 2026 K-Beauty Insider. All rights reserved.</div>
-        </div>
-      </footer>
-    </main>
-  );
-}
+            <div className={styles.cardTitle}>Partner Clinics Pricing</div>
+            <div className
