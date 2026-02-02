@@ -527,7 +527,6 @@ export default function Home() {
 
           <div className={styles.sliderWrap}>
             <div className={styles.sliderTrack} 
-              className={styles.sliderTrack}
               id="trendSlider"
               onClickCapture={(e) => {
                 if (Date.now() < blockClickUntilRef.current) {
