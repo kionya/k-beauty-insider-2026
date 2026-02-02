@@ -825,7 +825,7 @@
 /* ---------- Partners ---------- */
 .partnerGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* PC: 3개 */
   gap: 14px;
 }
 
@@ -1223,13 +1223,19 @@
 /* ---------- Responsive ---------- */
 @media (max-width: 980px) {
   .heroGrid { grid-template-columns: 1fr; }
-  .partnerGrid { grid-template-columns: repeat(2, 1fr); }
+  .partnerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 721px) {
+  .partnerGrid > :nth-child(n + 16) {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {
   .nav { display: none; } /* desktop nav 숨김 */
   .mobileNavBtn { display: inline-flex; align-items: center; justify-content: center; }
-
+  .partnerGrid {  grid-template-columns: 1fr; /* 모바일: 1개 */}
   .h1 { font-size: 40px; }
   .section { padding: 58px 0; }
   .stampsGrid { grid-template-columns: repeat(5, 1fr); }
