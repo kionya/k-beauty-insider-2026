@@ -1217,20 +1217,27 @@
   border-bottom: 1px solid rgba(255,255,255,.10);
   backdrop-filter: blur(12px);
 }
-/* ===== Scroll reveal ===== */
-.revealOn{} /* JS가 붙이는 클래스 (빈 셀렉터로 모듈 export 확보) */
-
-[data-reveal]{
-  opacity: 0;   transform: translateY(18px);   transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);   will-change: opacity, transform;
+/* page가 로컬 클래스이므로 "pure selector" 조건 충족 */
+.page [data-reveal]{
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 700ms ease, transform 700ms cubic-bezier(.2,.8,.2,1);
+  will-change: opacity, transform;
 }
 
-:global(.revealOn){
-  opacity: 1;   transform: translateY(0);
+/* JS에서 el.classList.add(styles.revealOn) 하므로 revealOn은 로컬 클래스 */
+.page .revealOn{
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* 모션 최소화 설정 존중 */
 @media (prefers-reduced-motion: reduce){
-  [data-reveal]{ opacity:1; transform:none; transition:none; }
+  .page [data-reveal]{
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 /* ===== Tilt ===== */
