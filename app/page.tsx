@@ -689,7 +689,7 @@ export default function Home() {
           </div>
 
           <div className={styles.partnerGrid}>
-            {PARTNERS.map((p, idx) => (
+            {PARTNERS.slice(0, 15).map((p, idx) => (
                 <div key={idx} className={`${styles.partnerCard} ${styles.tilt}`} data-tilt data-reveal>
                 <div className={styles.partnerTag}>
                   <span className={`${styles.pill} ${styles.pillBrand}`}>FREE PASS</span>
