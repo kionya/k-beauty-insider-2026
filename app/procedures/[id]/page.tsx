@@ -17,7 +17,7 @@ type Procedure = {
   is_hot: boolean;
 };
 
-export default function ProcedureDetail({ params }: { params: { id: string } }) {
+export default function ProcedureDetail() {
   const params = useParams();
   const rawId = (params as any)?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId; // string | undefined
