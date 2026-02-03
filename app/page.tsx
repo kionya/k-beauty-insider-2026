@@ -32,9 +32,6 @@ type Procedure = {
   is_hot: boolean;
 };
 
-const [featuredClinics, setFeaturedClinics] = useState<Clinic[]>([]);
-const [freepassClinics, setFreepassClinics] = useState<Clinic[]>([]);
-
 const WHY_FEATURES = [
   {
     title: 'Price Comparison',
@@ -80,8 +77,8 @@ export default function Home() {
   // Data
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
-  const [featuredClinics, setFeaturedClinics] = useState<any[]>([]);
-  const [freepassClinics, setFreepassClinics] = useState<any[]>([]);
+  const [featuredClinics, setFeaturedClinics] = useState<Clinic[]>([]);
+  const [freepassClinics, setFreepassClinics] = useState<Clinic[]>([]);
 
   // Auth
   const [user, setUser] = useState<any>(null);
@@ -524,7 +521,7 @@ export default function Home() {
                 <div className={styles.partnerTop}>
                   <span className={styles.pill}>FREE PASS</span>
                   <span className={styles.rating}>
-                    <i className="fa-solid fa-star" aria-hidden="true" /> {c.rating.toFixed(1)} <span>({c.reviews})</span>
+                    <i className="fa-solid fa-star" aria-hidden="true" /> {(c.rating ?? 0).toFixed(1)} <span>({c.reviews ?? 0})</span>
                   </span>
                 </div>
 
