@@ -1161,3 +1161,65 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+.partnerGrid {
+  display: grid;
+  grid-template-columns: 1fr; /* 모바일 기본 1열 */
+  gap: 14px;
+}
+
+.partnerCard {
+  border-radius: 18px;
+  border: 1px solid rgba(20, 20, 34, 0.10);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 40px rgba(20, 20, 34, 0.10);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.partnerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.partnerIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ff67b2 0%, #a86bff 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.partnerBottom {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.priceFrom {
+  font-weight: 950;
+  color: rgba(20, 20, 34, 0.72);
+}
+
+@media (max-width: 980px) {
+  .partnerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 721px) {
+  .partnerGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .partnerGrid > :nth-child(n + 16) {
+    display: none; /* PC에서만 15개 제한 */
+  }
+}

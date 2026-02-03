@@ -7,6 +7,20 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import { supabase } from './supabase';
 import styles from './page.module.css';
 
+type Clinic = {
+  id: number;
+  name: string;
+  category: string | null;
+  district: string | null;
+  location: string | null;
+  rating: number | null;
+  reviews: number | null;
+  hero_image_url: string | null;
+  is_featured: boolean;
+  is_freepass: boolean;
+  sort_rank: number;
+};
+
 type Procedure = {
   id: number;
   name: string;
@@ -18,11 +32,8 @@ type Procedure = {
   is_hot: boolean;
 };
 
-const FEATURED_CLINICS = [
-  { name: 'Elite Plastic Surgery', district: 'Gangnam', rating: 4.9, reviews: 245, priceFromUsd: 2500 },
-  { name: 'Glow Dermatology', district: 'Seocho', rating: 4.8, reviews: 198, priceFromUsd: 800 },
-  { name: 'Beauty Line Clinic', district: 'Gangnam', rating: 5.0, reviews: 132, priceFromUsd: 500 },
-];
+const [featuredClinics, setFeaturedClinics] = useState<Clinic[]>([]);
+const [freepassClinics, setFreepassClinics] = useState<Clinic[]>([]);
 
 const WHY_FEATURES = [
   {
@@ -136,6 +147,17 @@ export default function Home() {
       else setCurrentStamps(0);
       setLoading(false);
     };
+
+    const [featRes, freeRes] = await Promise.all([
+      fetch('/api/clinics?featured=1', { cache: 'no-store' }),
+      fetch('/api/clinics?freepass=1', { cache: 'no-store' }),
+    ]);
+
+    const featJson = await featRes.json().catch(() => ({}));
+    const freeJson = await freeRes.json().catch(() => ({}));
+
+    setFeaturedClinics(featJson.data ?? []);
+    setFreepassClinics(freeJson.data ?? []);
 
     init();
 
@@ -458,8 +480,8 @@ export default function Home() {
 
             {currentStamps >= MAX_STAMPS ? (
               <div className={styles.rewardRow}>
-                <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('prices')}>
-                  Select Free Procedure
+                <button className={styles.btnPrimary} type="button" onClick={() => scrollToId('freepass')}>
+                  Redeem at Free Pass Clinics
                 </button>
               </div>
             ) : (
@@ -471,6 +493,50 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Free Pass Clinics */}
+      <section id="freepass" className={styles.sectionAlt} data-reveal>
+        <div className="container">
+          <div className={styles.sectionHeadRow} data-reveal>
+            <div>
+              <h2 className={styles.h2}>Free Pass Clinics</h2>
+              <p className={styles.sub}>Redeem your free procedure at verified partner clinics.</p>
+            </div>
+
+            <button className={styles.btnSoftSmall} type="button" onClick={() => scrollToId('prices')}>
+              See Price List
+            </button>
+          </div>
+
+          <div className={styles.partnerGrid}>
+            {featuredClinics.map((c) => (
+              <article key={c.name} className={styles.partnerCard} data-reveal>
+                <div className={styles.partnerTop}>
+                  <span className={styles.pill}>FREE PASS</span>
+                  <span className={styles.rating}>
+                    <i className="fa-solid fa-star" aria-hidden="true" /> {c.rating.toFixed(1)} <span>({c.reviews})</span>
+                  </span>
+                </div>
+
+                <div className={styles.partnerIcon} aria-hidden="true">
+                  <i className="fa-solid fa-hospital" />
+                </div>
+
+                <h3 className={styles.cardTitle}>{c.name}</h3>
+                <p className={styles.cardDesc}>
+                  {c.district} • Verified partner • English-friendly support
+                </p>
+
+                <div className={styles.partnerBottom}>
+                  <div className={styles.priceFrom}>From ${c.priceFromUsd.toLocaleString()}+</div>
+                  <button className={styles.btnPrimarySmall} type="button" onClick={() => scrollToId('contact')}>
+                    Contact
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Why choose */}
       <section id="why" className={styles.section} data-reveal>
