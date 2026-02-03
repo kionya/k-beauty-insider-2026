@@ -19,6 +19,9 @@ type Clinic = {
   is_featured: boolean;
   is_freepass: boolean;
   sort_rank: number;
+
+  // ✅ 추가
+  price_from_usd: number | string | null;
 };
 
 type Procedure = {
@@ -130,7 +133,11 @@ export default function Home() {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
+  const formatUsdFrom = (v: unknown) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return 'Contact for Price';
+    return `From $${Math.round(n).toLocaleString()}+`;
+  };
   // init
   useEffect(() => {
     const init = async () => {
@@ -517,7 +524,7 @@ export default function Home() {
 
           <div className={styles.partnerGrid}>
             {freepassClinics.map((c) => (
-              <article key={c.name} className={styles.partnerCard} data-reveal>
+              <article key={c.id} className={styles.partnerCard} data-reveal>
                 <div className={styles.partnerTop}>
                   <span className={styles.pill}>FREE PASS</span>
                   <span className={styles.rating}>
@@ -535,7 +542,7 @@ export default function Home() {
                 </p>
 
                 <div className={styles.partnerBottom}>
-                  <div className={styles.priceFrom}>From ${c.priceFromUsd.toLocaleString()}+</div>
+                  <div className={styles.priceFrom}>{formatUsdFrom(c.price_from_usd)}</div>
                   <button className={styles.btnPrimarySmall} type="button" onClick={() => scrollToId('contact')}>
                     Contact
                   </button>
@@ -583,20 +590,20 @@ export default function Home() {
 
           <div className={styles.clinicGrid}>
             {featuredClinics.map((c) => (
-              <article key={c.name} className={styles.clinicCard} data-reveal>
+              <article key={c.id} className={styles.clinicCard} data-reveal>
                 <div className={styles.clinicThumb} aria-hidden="true" />
                 <div className={styles.clinicBody}>
                   <div className={styles.clinicTop}>
                     <span className={styles.pill}>{c.district}</span>
                     <span className={styles.rating}>
-                      <i className="fa-solid fa-star" aria-hidden="true" /> {c.rating.toFixed(1)} <span>({c.reviews})</span>
+                      <i className="fa-solid fa-star" aria-hidden="true" /> {(c.rating ?? 0).toFixed(1)} <span>({c.reviews ?? 0})</span>
                     </span>
                   </div>
                   <h3 className={styles.cardTitle}>{c.name}</h3>
                   <p className={styles.cardDesc}>Verified partner clinic • English-friendly support</p>
 
                   <div className={styles.clinicBottom}>
-                    <div className={styles.priceFrom}>${c.priceFromUsd.toLocaleString()}+</div>
+                    <div className={styles.priceFrom}>{formatUsdFrom(c.price_from_usd)}</div>
                     <button className={styles.btnPrimarySmall} type="button" onClick={() => scrollToId('prices')}>
                       View Details
                     </button>
