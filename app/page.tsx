@@ -80,6 +80,8 @@ export default function Home() {
   // Data
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featuredClinics, setFeaturedClinics] = useState<any[]>([]);
+  const [freepassClinics, setFreepassClinics] = useState<any[]>([]);
 
   // Auth
   const [user, setUser] = useState<any>(null);
@@ -135,9 +137,11 @@ export default function Home() {
   // init
   useEffect(() => {
     const init = async () => {
+      // 1) procedures
       const { data } = await supabase.from('procedures').select('*').order('rank', { ascending: true });
       if (data) setProcedures(data as any);
 
+      // 2) auth
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -145,19 +149,26 @@ export default function Home() {
       setUser(session?.user || null);
       if (session?.user) fetchMyStamps(session.user.id);
       else setCurrentStamps(0);
+
+      // 3) clinics (featured / freepass)  ✅ 여기서 await 사용
+      try {
+        const [featRes, freeRes] = await Promise.all([
+          fetch('/api/clinics?featured=1', { cache: 'no-store' }),
+          fetch('/api/clinics?freepass=1', { cache: 'no-store' }),
+        ]);
+
+        const featJson = await featRes.json().catch(() => ({}));
+        const freeJson = await freeRes.json().catch(() => ({}));
+
+        setFeaturedClinics(featJson.data ?? []);
+        setFreepassClinics(freeJson.data ?? []);
+      } catch {
+        setFeaturedClinics([]);
+        setFreepassClinics([]);
+      }
+
       setLoading(false);
     };
-
-    const [featRes, freeRes] = await Promise.all([
-      fetch('/api/clinics?featured=1', { cache: 'no-store' }),
-      fetch('/api/clinics?freepass=1', { cache: 'no-store' }),
-    ]);
-
-    const featJson = await featRes.json().catch(() => ({}));
-    const freeJson = await freeRes.json().catch(() => ({}));
-
-    setFeaturedClinics(featJson.data ?? []);
-    setFreepassClinics(freeJson.data ?? []);
 
     init();
 
@@ -508,7 +519,7 @@ export default function Home() {
           </div>
 
           <div className={styles.partnerGrid}>
-            {featuredClinics.map((c) => (
+            {freepassClinics.map((c) => (
               <article key={c.name} className={styles.partnerCard} data-reveal>
                 <div className={styles.partnerTop}>
                   <span className={styles.pill}>FREE PASS</span>
@@ -574,7 +585,7 @@ export default function Home() {
           </div>
 
           <div className={styles.clinicGrid}>
-            {FEATURED_CLINICS.map((c) => (
+            {featuredClinics.map((c) => (
               <article key={c.name} className={styles.clinicCard} data-reveal>
                 <div className={styles.clinicThumb} aria-hidden="true" />
                 <div className={styles.clinicBody}>
